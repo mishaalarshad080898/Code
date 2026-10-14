@@ -10,10 +10,14 @@ codeunit 50107 "IP Purchase Order Events"
         Context: Codeunit "IP Filler Integration Context";
         LogMgt: Codeunit "IP Filler Integration Log Mgt";
         DeleteNotAllowedErr: Label 'Purchase Order %1 cannot be deleted because linked Assembly Order %2 is not in Open status. Reopen the Assembly Order first.', Comment = '%1 = PO No., %2 = AO No.';
+        POReopenedTxt: Label 'Production request for Purchase Order %1 failed. The Purchase Order was reopened and must be released again once the issue is fixed.', Comment = '%1 = PO No.';
+        POReopenedMsg: Label 'The production request for Purchase Order %1 could not be sent to the filler, so the Purchase Order was set back to Open.\\See the Filler Integration Activity Log for the error, then release the Purchase Order again.', Comment = '%1 = PO No.';
         PODeletedTxt: Label 'Linked Purchase Order %1 was deleted. The Assembly Order link was cleared and Create PO Link can be run again.', Comment = '%1 = PO No.';
 
     /// <summary>
     /// PO release trigger point: sends the outbound production request for filler-linked POs.
+    /// If the send fails, the PO is reopened so it never stays released without the filler
+    /// having received the production request.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 5.14 Outbound Trigger Points (PO Release - Send Production Request)
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Release Purchase Document", 'OnAfterReleasePurchaseDoc', '', false, false)]
@@ -29,7 +33,26 @@ codeunit 50107 "IP Purchase Order Events"
             exit;
         if Context.IsOutboundSuppressed() then
             exit;
-        OutboundProdRequest.SendOnRelease(PurchaseHeader);
+        if not OutboundProdRequest.SendOnRelease(PurchaseHeader) then
+            ReopenAfterFailedSend(PurchaseHeader);
+    end;
+
+    /// <summary>
+    /// Sets the PO back to Open after a failed production request. Uses Reopen instead of
+    /// raising an error, because an error would roll back the Activity Log entry that records
+    /// the failure. With the PO open, Linked PO Released = No, so the AO cannot be released either.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.2 Create PO Link Function (2) Purchase Order release / 5.6 Outbound Production Request Processing
+    local procedure ReopenAfterFailedSend(var PurchaseHeader: Record "Purchase Header")
+    var
+        ReleasePurchaseDocument: Codeunit "Release Purchase Document";
+    begin
+        ReleasePurchaseDocument.Reopen(PurchaseHeader);
+        LogMgt.LogEvent("IP Integration Direction"::Internal, "IP Integration Event Type"::"Production Request", "IP Integration Status"::Exception,
+            PurchaseHeader."Buy-from Vendor No.", PurchaseHeader."IP Linked Assembly Order No.", PurchaseHeader."No.", 0,
+            StrSubstNo(POReopenedTxt, PurchaseHeader."No."), '');
+        if GuiAllowed() then
+            Message(POReopenedMsg, PurchaseHeader."No.");
     end;
 
     /// <summary>

@@ -49,10 +49,11 @@ codeunit 50100 "IP Create PO Link"
             StrSubstNo(LinkCreatedTxt, PurchaseHeader."No.", AssemblyHeader."No."), '');
 
         // Purchase Orders are automatically released; the release triggers the outbound production request.
+        // If the production request fails, IP Purchase Order Events reopens the PO and informs the user.
         ReleasePurchaseDocument.Run(PurchaseHeader);
         AssemblyHeader.Get(AssemblyHeader."Document Type", AssemblyHeader."No.");
 
-        if GuiAllowed() then
+        if GuiAllowed() and (PurchaseHeader.Status = PurchaseHeader.Status::Released) then
             Message(LinkCreatedMsg, PurchaseHeader."No.");
     end;
 

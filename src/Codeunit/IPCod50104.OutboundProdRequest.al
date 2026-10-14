@@ -16,30 +16,31 @@ codeunit 50104 "IP Outbound Prod. Request"
 
     /// <summary>
     /// Entry point from the PO release event. Sends the production request when the PO is
-    /// released for the first time, or re-released with a changed quantity.
+    /// released for the first time, or re-released with a changed quantity. Returns false only
+    /// when the send failed, so the caller can stop the PO from staying released.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 5.14 Outbound Trigger Points (PO Release)
-    procedure SendOnRelease(var PurchaseHeader: Record "Purchase Header")
+    procedure SendOnRelease(var PurchaseHeader: Record "Purchase Header"): Boolean
     var
         PurchaseLine: Record "Purchase Line";
     begin
         if not GetLinkedLine(PurchaseHeader, PurchaseLine) then
-            exit;
+            exit(true);
         if PurchaseHeader."IP Prod. Request Sent" and (PurchaseHeader."IP Prod. Request Sent Qty" = PurchaseLine.Quantity) then begin
             LogMgt.LogEvent("IP Integration Direction"::Outbound, "IP Integration Event Type"::"Production Request", "IP Integration Status"::Skipped,
                 PurchaseHeader."Buy-from Vendor No.", PurchaseHeader."IP Linked Assembly Order No.", PurchaseHeader."No.", PurchaseLine."Line No.",
                 StrSubstNo(NotResentTxt, PurchaseHeader."No."), '');
-            exit;
+            exit(true);
         end;
-        SendProductionRequest(PurchaseHeader, PurchaseLine);
+        exit(SendProductionRequest(PurchaseHeader, PurchaseLine));
     end;
 
     /// <summary>
     /// Builds and sends the production request payload. Updates the PO transmission flags and
-    /// the AO Filler Status.
+    /// the AO Filler Status. Returns false when the filler endpoint did not accept the payload.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing
-    procedure SendProductionRequest(var PurchaseHeader: Record "Purchase Header"; PurchaseLine: Record "Purchase Line")
+    procedure SendProductionRequest(var PurchaseHeader: Record "Purchase Header"; PurchaseLine: Record "Purchase Line"): Boolean
     var
         FillerSetup: Record "IP Filler Integration Setup";
         AssemblyHeader: Record "Assembly Header";
@@ -47,9 +48,9 @@ codeunit 50104 "IP Outbound Prod. Request"
         PayloadText: Text;
     begin
         if not FillerSetup.Get(PurchaseHeader."Buy-from Vendor No.") then
-            exit;
+            exit(true);
         if not FillerSetup."Integration Enabled" then
-            exit;
+            exit(true);
         AssemblyHeader.Get(AssemblyHeader."Document Type"::Order, PurchaseHeader."IP Linked Assembly Order No.");
 
         MessageID := Format(CreateGuid(), 0, 4);
@@ -63,8 +64,11 @@ codeunit 50104 "IP Outbound Prod. Request"
             PurchaseHeader.Modify();
             if AssemblyHeader."IP Filler Status" in [AssemblyHeader."IP Filler Status"::" ", AssemblyHeader."IP Filler Status"::Linked, AssemblyHeader."IP Filler Status"::Exception] then
                 LogMgt.UpdateFillerStatus(AssemblyHeader."No.", "IP Filler Status"::"Production Request Sent");
-        end else
-            LogMgt.UpdateFillerStatus(AssemblyHeader."No.", "IP Filler Status"::Exception);
+            exit(true);
+        end;
+
+        LogMgt.UpdateFillerStatus(AssemblyHeader."No.", "IP Filler Status"::Exception);
+        exit(false);
     end;
 
     /// <summary>
