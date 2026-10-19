@@ -29,6 +29,8 @@ codeunit 50108 "IP Inbound Validation"
         ItemMismatchErr: Label 'Item identity: payload item %1 does not match the finished good %2 on Assembly Order %3.', Comment = '%1 = Payload item, %2 = AO item, %3 = AO No.';
         PriceMismatchErr: Label 'Pricing validation failed: received unit price %1 does not match Direct Unit Cost %2 on PO %3 line %4 (currency %5).', Comment = '%1 = Payload price, %2 = PO price, %3 = PO No., %4 = Line No., %5 = Currency Code';
         OverReceiptErr: Label 'Over-receipt tolerance exceeded: receiving %1 on PO %2 gives a total over-receipt of %3, but the allowed over-receipt is %4 (%5% of ordered quantity %6, Over-Receipt Code %7).', Comment = '%1 = Completed qty, %2 = PO No., %3 = Total overage, %4 = Allowed overage, %5 = Tolerance %, %6 = Ordered qty, %7 = Over-Receipt Code';
+        OverReceiptCodeMissingErr: Label 'Over-receipt not allowed: the completed quantity %1 is more than the outstanding quantity %2 on PO %3 line %4, but the PO line has no Over-Receipt Code. Set an Over-Receipt Code on the PO line and retry.', Comment = '%1 = Completed qty, %2 = Outstanding qty, %3 = PO No., %4 = Line No.';
+        OverReceiptCodeNotFoundErr: Label 'Over-receipt not allowed: Over-Receipt Code %1 on PO %2 line %3 does not exist.', Comment = '%1 = Over-Receipt Code, %2 = PO No., %3 = Line No.';
         AOQuantityErr: Label 'Production quantity: completed quantity %1 is more than the remaining quantity %2 on Assembly Order %3.', Comment = '%1 = Completed qty, %2 = Remaining qty, %3 = AO No.';
         DuplicateErr: Label 'Duplicate transaction: a payload with Message ID %1 (or the same vendor, PO and payload timestamp) has already been processed.', Comment = '%1 = Message ID';
 
@@ -219,10 +221,11 @@ codeunit 50108 "IP Inbound Validation"
     end;
 
     /// <summary>
-    /// Production / PO receipt quantity and over-receipt tolerance. The over-receipt % comes from
-    /// the Over-Receipt Code that the item card carries forward to the PO line. The total
-    /// over-receipt is measured against the originally requested quantity. If it is exceeded,
-    /// nothing is posted and the entry becomes an Exception.
+    /// Production / PO receipt quantity and over-receipt tolerance. When the completed quantity is
+    /// more than the PO outstanding quantity (overage), the PO line must have an Over-Receipt Code
+    /// (e.g. 2%, 5%); a blank or unknown code stops processing. The total over-receipt is measured
+    /// against the originally requested quantity and must not exceed the code's tolerance %.
+    /// On any failure nothing is posted and the entry becomes an Exception.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.9 Receipt Overage Handling
     local procedure CheckQuantityAndOverReceipt(InboundEntry: Record "IP Filler Inbound Entry"; PurchaseHeader: Record "Purchase Header"; PurchaseLine: Record "Purchase Line"; AssemblyHeader: Record "Assembly Header")
@@ -242,9 +245,11 @@ codeunit 50108 "IP Inbound Validation"
         OrderedQty := PurchaseHeader."IP Prod. Request Sent Qty";
         if OrderedQty = 0 then
             OrderedQty := PurchaseLine.Quantity;
-        if PurchaseLine."Over-Receipt Code" <> '' then
-            if OverReceiptCode.Get(PurchaseLine."Over-Receipt Code") then
-                TolerancePct := OverReceiptCode."Over-Receipt Tolerance %";
+        if PurchaseLine."Over-Receipt Code" = '' then
+            Error(OverReceiptCodeMissingErr, InboundEntry."Completed Quantity", PurchaseLine."Outstanding Quantity", PurchaseLine."Document No.", PurchaseLine."Line No.");
+        if not OverReceiptCode.Get(PurchaseLine."Over-Receipt Code") then
+            Error(OverReceiptCodeNotFoundErr, PurchaseLine."Over-Receipt Code", PurchaseLine."Document No.", PurchaseLine."Line No.");
+        TolerancePct := OverReceiptCode."Over-Receipt Tolerance %";
 
         AllowedOverage := Round(OrderedQty * TolerancePct / 100, 0.00001);
         TotalOverage := PurchaseLine."Quantity Received" + InboundEntry."Completed Quantity" - OrderedQty;
