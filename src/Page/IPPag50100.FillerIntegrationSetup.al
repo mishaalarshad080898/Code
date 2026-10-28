@@ -3,7 +3,7 @@
 /// vendor, filler location (1:1), integration enabled, middleware/API profile, endpoint and key,
 /// and the ICR SCRAP journal batch.
 /// </summary>
-/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.5 Filler Integration Setup
+/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.5 Filler Integration Setup / Interface 3.1 PO/TO/ProdPO
 page 50100 "IP Filler Integration Setup"
 {
     Caption = 'Filler Integration Setup';
@@ -38,20 +38,67 @@ page 50100 "IP Filler Integration Setup"
                 {
                     ToolTip = 'Specifies the middleware endpoint that outbound payloads are posted to.';
                 }
+                field("Auth Type"; Rec."Auth Type")
+                {
+                    ToolTip = 'Specifies how BC authenticates against the filler endpoint: Basic (PO user and password), API Key, or None.';
+                }
+                field("API User Name"; Rec."API User Name")
+                {
+                    ToolTip = 'Specifies the PO user name for Basic authentication.';
+                }
+                field(APIPassword; APIPasswordText)
+                {
+                    Caption = 'API Password';
+                    ExtendedDatatype = Masked;
+                    ToolTip = 'Specifies the PO user password for Basic authentication. The password is kept in isolated storage, not in the database table.';
+
+                    trigger OnValidate()
+                    begin
+                        Rec.SetAPIPassword(APIPasswordText);
+                    end;
+                }
                 field("API Auth Header Name"; Rec."API Auth Header Name")
                 {
-                    ToolTip = 'Specifies the HTTP header name used to send the API key.';
+                    ToolTip = 'Specifies the HTTP header name used to send the API key (Authentication Type = API Key).';
                 }
                 field(APIKey; APIKeyText)
                 {
                     Caption = 'API Key';
                     ExtendedDatatype = Masked;
-                    ToolTip = 'Specifies the API key. The key is kept in isolated storage, not in the database table.';
+                    ToolTip = 'Specifies the API key (Authentication Type = API Key). The key is kept in isolated storage, not in the database table.';
 
                     trigger OnValidate()
                     begin
                         Rec.SetAPIKey(APIKeyText);
                     end;
+                }
+                field("ICR Company Code"; Rec."ICR Company Code")
+                {
+                    ToolTip = 'Specifies the company code sent as bukrs in the order message (default 1000).';
+                }
+                field("ICR Purch. Organization"; Rec."ICR Purch. Organization")
+                {
+                    ToolTip = 'Specifies the purchasing organization sent as ekorg in the order message (default 1000).';
+                }
+                field("ICR Purch. Group"; Rec."ICR Purch. Group")
+                {
+                    ToolTip = 'Specifies the purchasing group sent as ekgrp in the order message (default 010).';
+                }
+                field("ICR Plant"; Rec."ICR Plant")
+                {
+                    ToolTip = 'Specifies the plant sent as werks on each order line (default 1000).';
+                }
+                field("Prod. PO Order Type"; Rec."Prod. PO Order Type")
+                {
+                    ToolTip = 'Specifies the order type (bsart) sent for production POs linked to an Assembly Order.';
+                }
+                field("Purch. Order Type"; Rec."Purch. Order Type")
+                {
+                    ToolTip = 'Specifies the order type (bsart) sent for purchase orders delivered to the filler location.';
+                }
+                field("Transfer Order Type"; Rec."Transfer Order Type")
+                {
+                    ToolTip = 'Specifies the order type (bsart) sent for transfer orders to the filler location.';
                 }
                 field("Scrap Jnl. Template Name"; Rec."Scrap Jnl. Template Name")
                 {
@@ -94,6 +141,7 @@ page 50100 "IP Filler Integration Setup"
 
     var
         APIKeyText: Text;
+        APIPasswordText: Text;
         MaskTok: Label '********', Locked = true;
 
     trigger OnAfterGetRecord()
@@ -102,10 +150,15 @@ page 50100 "IP Filler Integration Setup"
             APIKeyText := MaskTok
         else
             APIKeyText := '';
+        if Rec.HasAPIPassword() then
+            APIPasswordText := MaskTok
+        else
+            APIPasswordText := '';
     end;
 
     trigger OnNewRecord(BelowxRec: Boolean)
     begin
         APIKeyText := '';
+        APIPasswordText := '';
     end;
 }

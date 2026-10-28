@@ -2,7 +2,7 @@
 /// Business event recorded in the Filler Integration Activity Log. Covers the outbound trigger
 /// points, inbound payload processing and each automated BC posting step.
 /// </summary>
-/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.14 Outbound Trigger Points / 5.15 Inbound Payload Processing
+/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.14 Outbound Trigger Points / 5.15 Inbound Payload Processing / Interface 3.1 PO/TO/ProdPO
 enum 50103 "IP Integration Event Type"
 {
     Extensible = true;
@@ -63,5 +63,13 @@ enum 50103 "IP Integration Event Type"
     value(13; "PO Deleted")
     {
         Caption = 'PO Deleted';
+    }
+    value(14; "Purchase Order")
+    {
+        Caption = 'Purchase Order';
+    }
+    value(15; "Transfer Order")
+    {
+        Caption = 'Transfer Order';
     }
 }

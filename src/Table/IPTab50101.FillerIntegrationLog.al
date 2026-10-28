@@ -112,6 +112,14 @@ table 50101 "IP Filler Integration Log"
             Caption = 'Created By';
             DataClassification = EndUserIdentifiableInformation;
         }
+        field(24; "Document Type"; Enum "IP Integration Doc. Type")
+        {
+            Caption = 'Document Type';
+        }
+        field(25; "Document No."; Code[20])
+        {
+            Caption = 'Document No.';
+        }
     }
 
     keys
@@ -127,6 +135,9 @@ table 50101 "IP Filler Integration Log"
         {
         }
         key(StatusKey; Status, Direction)
+        {
+        }
+        key(DocumentKey; "Document No.", "Document Type")
         {
         }
     }

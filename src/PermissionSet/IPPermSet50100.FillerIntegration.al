@@ -37,5 +37,7 @@ permissionset 50100 "IP FILLER INTEG"
         codeunit "IP Inbound Job Queue" = X,
         codeunit "IP Phantom Lot Mgt" = X,
         codeunit "IP Scrap Posting" = X,
-        codeunit "IP Quantity Synchronization" = X;
+        codeunit "IP Quantity Synchronization" = X,
+        codeunit "IP ICR Order Message" = X,
+        codeunit "IP Transfer Order Events" = X;
 }

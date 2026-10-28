@@ -64,6 +64,50 @@ table 50100 "IP Filler Integration Setup"
             Caption = 'Auto Post Scrap';
             InitValue = true;
         }
+        field(10; "Auth Type"; Enum "IP Filler Auth Type")
+        {
+            Caption = 'Authentication Type';
+            InitValue = Basic;
+        }
+        field(11; "API User Name"; Text[100])
+        {
+            Caption = 'API User Name';
+        }
+        field(12; "ICR Company Code"; Code[10])
+        {
+            Caption = 'Company Code (bukrs)';
+            InitValue = '1000';
+        }
+        field(13; "ICR Purch. Organization"; Code[10])
+        {
+            Caption = 'Purchasing Organization (ekorg)';
+            InitValue = '1000';
+        }
+        field(14; "ICR Purch. Group"; Code[10])
+        {
+            Caption = 'Purchasing Group (ekgrp)';
+            InitValue = '010';
+        }
+        field(15; "ICR Plant"; Code[10])
+        {
+            Caption = 'Plant (werks)';
+            InitValue = '1000';
+        }
+        field(16; "Prod. PO Order Type"; Code[10])
+        {
+            Caption = 'Production PO Order Type (bsart)';
+            InitValue = 'ZFER';
+        }
+        field(17; "Purch. Order Type"; Code[10])
+        {
+            Caption = 'Purchase Order Type (bsart)';
+            InitValue = 'ZRFE';
+        }
+        field(18; "Transfer Order Type"; Code[10])
+        {
+            Caption = 'Transfer Order Type (bsart)';
+            InitValue = 'ZRFE';
+        }
     }
 
     keys
@@ -80,10 +124,12 @@ table 50100 "IP Filler Integration Setup"
     var
         LocationAlreadyUsedErr: Label 'Filler Location %1 is already assigned to vendor %2. Vendor and filler location must be a 1:1 relationship.', Comment = '%1 = Location Code, %2 = Vendor No.';
         APIKeyStorageKeyTok: Label 'IPFillerAPIKey-%1', Locked = true, Comment = '%1 = Setup SystemId';
+        APIPasswordStorageKeyTok: Label 'IPFillerAPIPwd-%1', Locked = true, Comment = '%1 = Setup SystemId';
 
     trigger OnDelete()
     begin
         DeleteAPIKey();
+        SetAPIPassword('');
     end;
 
     /// <summary>
@@ -162,6 +208,53 @@ table 50100 "IP Filler Integration Setup"
     begin
         if IsolatedStorage.Contains(GetAPIKeyStorageKey(), DataScope::Company) then
             IsolatedStorage.Delete(GetAPIKeyStorageKey(), DataScope::Company);
+    end;
+
+    /// <summary>
+    /// Stores the Basic Auth password (PO user password) in isolated storage. Blank removes it.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Authentication: Basic Auth)
+    [NonDebuggable]
+    procedure SetAPIPassword(NewPassword: Text)
+    begin
+        if NewPassword = '' then begin
+            if IsolatedStorage.Contains(GetAPIPasswordStorageKey(), DataScope::Company) then
+                IsolatedStorage.Delete(GetAPIPasswordStorageKey(), DataScope::Company);
+            exit;
+        end;
+        IsolatedStorage.Set(GetAPIPasswordStorageKey(), NewPassword, DataScope::Company);
+    end;
+
+    /// <summary>
+    /// Returns the Basic Auth password from isolated storage.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Authentication: Basic Auth)
+    [NonDebuggable]
+    procedure GetAPIPassword(): Text
+    var
+        APIPassword: Text;
+    begin
+        if IsolatedStorage.Get(GetAPIPasswordStorageKey(), DataScope::Company, APIPassword) then
+            exit(APIPassword);
+        exit('');
+    end;
+
+    /// <summary>
+    /// Returns true when a Basic Auth password has been stored for this filler.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Authentication: Basic Auth)
+    procedure HasAPIPassword(): Boolean
+    begin
+        exit(IsolatedStorage.Contains(GetAPIPasswordStorageKey(), DataScope::Company));
+    end;
+
+    /// <summary>
+    /// Builds the isolated storage key for the Basic Auth password.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Authentication: Basic Auth)
+    local procedure GetAPIPasswordStorageKey(): Text
+    begin
+        exit(StrSubstNo(APIPasswordStorageKeyTok, Format(Rec.SystemId, 0, 4)));
     end;
 
     /// <summary>

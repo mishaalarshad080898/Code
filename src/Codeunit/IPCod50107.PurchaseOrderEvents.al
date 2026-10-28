@@ -1,40 +1,45 @@
 /// <summary>
-/// Purchase Order event subscribers. They send the production request on PO release,
-/// synchronize the AO quantity from the PO quantity, block deletion of a linked PO unless the
-/// AO is Open, and clear the AO link when the PO is deleted so Create PO Link can be run again.
+/// Purchase Order event subscribers. They send the ICR order message (production PO, or PO
+/// delivered to a filler location) on PO release and on PO deletion, synchronize the AO quantity
+/// from the PO quantity, block deletion of a linked PO unless the AO is Open, and clear the AO link
+/// when the PO is deleted so Create PO Link can be run again.
 /// </summary>
-/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 4.3 Quantity & Document Control Assumptions (1)
+/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 4.3 Quantity & Document Control Assumptions (1) / Interface 3.1 PO/TO/ProdPO
 codeunit 50107 "IP Purchase Order Events"
 {
     var
         Context: Codeunit "IP Filler Integration Context";
         LogMgt: Codeunit "IP Filler Integration Log Mgt";
         DeleteNotAllowedErr: Label 'Purchase Order %1 cannot be deleted because linked Assembly Order %2 is not in Open status. Reopen the Assembly Order first.', Comment = '%1 = PO No., %2 = AO No.';
-        POReopenedTxt: Label 'Production request for Purchase Order %1 failed. The Purchase Order was reopened and must be released again once the issue is fixed.', Comment = '%1 = PO No.';
-        POReopenedMsg: Label 'The production request for Purchase Order %1 could not be sent to the filler, so the Purchase Order was set back to Open.\\See the Filler Integration Activity Log for the error, then release the Purchase Order again.', Comment = '%1 = PO No.';
+        POReopenedTxt: Label 'Order message for Purchase Order %1 failed. The Purchase Order was reopened and must be released again once the issue is fixed.', Comment = '%1 = PO No.';
+        POReopenedMsg: Label 'The order message for Purchase Order %1 could not be sent to the filler, so the Purchase Order was set back to Open.\\Reason: %2\\See the Filler Integration Activity Log, then release the Purchase Order again.', Comment = '%1 = PO No., %2 = Error';
+        DeleteNotSentErr: Label 'Purchase Order %1 cannot be deleted because the delete message could not be sent to the filler: %2', Comment = '%1 = PO No., %2 = Error';
         PODeletedTxt: Label 'Linked Purchase Order %1 was deleted. The Assembly Order link was cleared and Create PO Link can be run again.', Comment = '%1 = PO No.';
 
     /// <summary>
-    /// PO release trigger point: sends the outbound production request for filler-linked POs.
-    /// If the send fails, the PO is reopened so it never stays released without the filler
-    /// having received the production request.
+    /// PO release trigger point: sends the ICR order message (Create on first release, Update when
+    /// changed) for production POs and for POs delivered to a filler location. If the send fails,
+    /// the PO is reopened so it never stays released without the filler having received it.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 5.14 Outbound Trigger Points (PO Release - Send Production Request)
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Release Purchase Document", 'OnAfterReleasePurchaseDoc', '', false, false)]
     local procedure ReleasePurchaseDocOnAfterRelease(var PurchaseHeader: Record "Purchase Header"; PreviewMode: Boolean)
     var
         OutboundProdRequest: Codeunit "IP Outbound Prod. Request";
+        ICROrderMessage: Codeunit "IP ICR Order Message";
     begin
         if PreviewMode then
             exit;
         if PurchaseHeader."Document Type" <> PurchaseHeader."Document Type"::Order then
             exit;
-        if not PurchaseHeader."IP Filler Integration" then
-            exit;
         if Context.IsOutboundSuppressed() then
             exit;
-        if not OutboundProdRequest.SendOnRelease(PurchaseHeader) then
-            ReopenAfterFailedSend(PurchaseHeader);
+        if PurchaseHeader."IP Filler Integration" then begin
+            if not OutboundProdRequest.SendOnRelease(PurchaseHeader) then
+                ReopenAfterFailedSend(PurchaseHeader, OutboundProdRequest.GetLastFailureText());
+        end else
+            if not ICROrderMessage.SendPurchaseOrder(PurchaseHeader) then
+                ReopenAfterFailedSend(PurchaseHeader, ICROrderMessage.GetLastFailureText());
     end;
 
     /// <summary>
@@ -43,16 +48,21 @@ codeunit 50107 "IP Purchase Order Events"
     /// the failure. With the PO open, Linked PO Released = No, so the AO cannot be released either.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.2 Create PO Link Function (2) Purchase Order release / 5.6 Outbound Production Request Processing
-    local procedure ReopenAfterFailedSend(var PurchaseHeader: Record "Purchase Header")
+    local procedure ReopenAfterFailedSend(var PurchaseHeader: Record "Purchase Header"; FailureText: Text)
     var
         ReleasePurchaseDocument: Codeunit "Release Purchase Document";
+        EventType: Enum "IP Integration Event Type";
     begin
         ReleasePurchaseDocument.Reopen(PurchaseHeader);
-        LogMgt.LogEvent("IP Integration Direction"::Internal, "IP Integration Event Type"::"Production Request", "IP Integration Status"::Exception,
+        if PurchaseHeader."IP Filler Integration" then
+            EventType := EventType::"Production Request"
+        else
+            EventType := EventType::"Purchase Order";
+        LogMgt.LogEvent("IP Integration Direction"::Internal, EventType, "IP Integration Status"::Exception,
             PurchaseHeader."Buy-from Vendor No.", PurchaseHeader."IP Linked Assembly Order No.", PurchaseHeader."No.", 0,
-            StrSubstNo(POReopenedTxt, PurchaseHeader."No."), '');
+            StrSubstNo(POReopenedTxt, PurchaseHeader."No."), FailureText);
         if GuiAllowed() then
-            Message(POReopenedMsg, PurchaseHeader."No.");
+            Message(POReopenedMsg, PurchaseHeader."No.", FailureText);
     end;
 
     /// <summary>
@@ -75,22 +85,27 @@ codeunit 50107 "IP Purchase Order Events"
     end;
 
     /// <summary>
-    /// A linked PO can only be deleted by a user while the linked AO is in Open status.
+    /// A linked PO can only be deleted by a user while the linked AO is in Open status. When a PO
+    /// that was sent to the filler is deleted, the Delete message (all lines loekz = 'X') is sent
+    /// first; if that fails, the deletion is stopped so BC and the filler stay in line.
     /// </summary>
-    /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.2 Create PO Link Function (review: to delete PO, AO must be in Open status)
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.2 Create PO Link Function (review: to delete PO, AO must be in Open status) / Interface 3.1 PO/TO/ProdPO (Delete)
     [EventSubscriber(ObjectType::Table, Database::"Purchase Header", 'OnBeforeDeleteEvent', '', false, false)]
     local procedure PurchaseHeaderOnBeforeDelete(var Rec: Record "Purchase Header"; RunTrigger: Boolean)
     var
         AssemblyHeader: Record "Assembly Header";
+        ICROrderMessage: Codeunit "IP ICR Order Message";
     begin
         if Rec.IsTemporary() or (not RunTrigger) then
             exit;
-        if Rec."IP Linked Assembly Order No." = '' then
+        if Rec."Document Type" <> Rec."Document Type"::Order then
             exit;
-        if not AssemblyHeader.Get(AssemblyHeader."Document Type"::Order, Rec."IP Linked Assembly Order No.") then
-            exit;
-        if AssemblyHeader.Status <> AssemblyHeader.Status::Open then
-            Error(DeleteNotAllowedErr, Rec."No.", AssemblyHeader."No.");
+        if Rec."IP Linked Assembly Order No." <> '' then
+            if AssemblyHeader.Get(AssemblyHeader."Document Type"::Order, Rec."IP Linked Assembly Order No.") then
+                if AssemblyHeader.Status <> AssemblyHeader.Status::Open then
+                    Error(DeleteNotAllowedErr, Rec."No.", AssemblyHeader."No.");
+        if not ICROrderMessage.SendPurchaseOrderDeletion(Rec) then
+            Error(DeleteNotSentErr, Rec."No.", ICROrderMessage.GetLastFailureText());
     end;
 
     /// <summary>

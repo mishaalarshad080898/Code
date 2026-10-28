@@ -47,6 +47,14 @@ page 50101 "IP Filler Integration Log"
                 {
                     ToolTip = 'Specifies the filler vendor.';
                 }
+                field("Document Type"; Rec."Document Type")
+                {
+                    ToolTip = 'Specifies the type of document the order message was sent for.';
+                }
+                field("Document No."; Rec."Document No.")
+                {
+                    ToolTip = 'Specifies the document the order message was sent for.';
+                }
                 field("Assembly Order No."; Rec."Assembly Order No.")
                 {
                     ToolTip = 'Specifies the linked Assembly Order.';
