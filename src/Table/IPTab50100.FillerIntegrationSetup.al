@@ -108,6 +108,20 @@ table 50100 "IP Filler Integration Setup"
             Caption = 'Transfer Order Type (bsart)';
             InitValue = 'ZRFE';
         }
+        field(19; "TO Outbound Trigger"; Enum "IP TO Outbound Trigger")
+        {
+            Caption = 'Transfer Order Outbound Trigger';
+        }
+        field(20; "FG 3PL Location Code"; Code[10])
+        {
+            Caption = 'Finished Goods 3PL Location Code';
+            TableRelation = Location where("Use As In-Transit" = const(false));
+        }
+        field(21; "FG In-Transit Code"; Code[10])
+        {
+            Caption = 'Finished Goods In-Transit Code';
+            TableRelation = Location where("Use As In-Transit" = const(true));
+        }
     }
 
     keys

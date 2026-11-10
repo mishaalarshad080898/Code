@@ -112,6 +112,18 @@ page 50100 "IP Filler Integration Setup"
                 {
                     ToolTip = 'Specifies whether scrap lines are posted automatically or left in the batch for user review.';
                 }
+                field("TO Outbound Trigger"; Rec."TO Outbound Trigger")
+                {
+                    ToolTip = 'Specifies when a raw material transfer order to this filler is sent: on shipment posting (Inventory Orchestration) or on release.';
+                }
+                field("FG 3PL Location Code"; Rec."FG 3PL Location Code")
+                {
+                    ToolTip = 'Specifies the 3PL location that finished goods shipped by this filler are transferred to when BC creates the transfer order.';
+                }
+                field("FG In-Transit Code"; Rec."FG In-Transit Code")
+                {
+                    ToolTip = 'Specifies the in-transit location used on finished goods transfer orders created from filler shipment payloads.';
+                }
             }
         }
     }
@@ -127,6 +139,14 @@ page 50100 "IP Filler Integration Setup"
                 RunObject = page "IP Filler Integration Log";
                 RunPageLink = "Vendor No." = field("Vendor No.");
                 ToolTip = 'Open the Activity Log for this filler.';
+            }
+            action(ICRMovements)
+            {
+                Caption = 'ICR Movements';
+                Image = Inventory;
+                RunObject = page "IP ICR Movements";
+                RunPageLink = "Vendor No." = field("Vendor No.");
+                ToolTip = 'Open the inbound ICR movements (goods receipts and finished goods shipments) received from this filler.';
             }
             action(InboundEntries)
             {

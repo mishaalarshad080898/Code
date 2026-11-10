@@ -2,6 +2,7 @@
 /// Permission set for users of the filler integration and the Filler Integration Activity Log.
 /// </summary>
 /// Comment - Functional Design Document for ICR-MRP integration v3 - 4.1 Operational Assumptions (5) / 5.5 Filler Integration Setup
+/// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility
 permissionset 50100 "IP FILLER INTEG"
 {
     Caption = 'IP Filler Integration';
@@ -12,10 +13,14 @@ permissionset 50100 "IP FILLER INTEG"
         tabledata "IP Filler Integration Log" = RIMD,
         tabledata "IP Filler Inbound Entry" = RIMD,
         tabledata "IP Filler Inbound Scrap Line" = RIMD,
+        tabledata "IP ICR Movement Header" = RIMD,
+        tabledata "IP ICR Movement Line" = RIMD,
         table "IP Filler Integration Setup" = X,
         table "IP Filler Integration Log" = X,
         table "IP Filler Inbound Entry" = X,
         table "IP Filler Inbound Scrap Line" = X,
+        table "IP ICR Movement Header" = X,
+        table "IP ICR Movement Line" = X,
         page "IP Filler Integration Setup" = X,
         page "IP Filler Integration Log" = X,
         page "IP Filler Inbound Entries" = X,
@@ -23,6 +28,11 @@ permissionset 50100 "IP FILLER INTEG"
         page "IP Filler Inbound Scrap Sub." = X,
         page "IP Filler Completion API" = X,
         page "IP Filler Scrap Line API" = X,
+        page "IP ICR Movement API" = X,
+        page "IP ICR Movement Line API" = X,
+        page "IP ICR Movements" = X,
+        page "IP ICR Movement" = X,
+        page "IP ICR Movement Subform" = X,
         codeunit "IP Create PO Link" = X,
         codeunit "IP Filler Integration Log Mgt" = X,
         codeunit "IP Filler Integration Context" = X,
@@ -39,5 +49,15 @@ permissionset 50100 "IP FILLER INTEG"
         codeunit "IP Scrap Posting" = X,
         codeunit "IP Quantity Synchronization" = X,
         codeunit "IP ICR Order Message" = X,
-        codeunit "IP Transfer Order Events" = X;
+        codeunit "IP Transfer Order Events" = X,
+        codeunit "IP Outbound Orch. Validation" = X,
+        codeunit "IP Transfer Orch. Events" = X,
+        codeunit "IP ICR Movement Processing" = X,
+        codeunit "IP ICR Movement Posting" = X,
+        codeunit "IP ICR Movement Validation" = X,
+        codeunit "IP Raw Material Receipt" = X,
+        codeunit "IP FG Shipment Processing" = X,
+        codeunit "IP Transfer Phantom Lot Mgt" = X,
+        codeunit "IP ICR Movement Log Mgt" = X,
+        codeunit "IP ICR Movement Job Queue" = X;
 }

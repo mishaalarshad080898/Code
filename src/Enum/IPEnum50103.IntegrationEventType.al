@@ -3,6 +3,7 @@
 /// points, inbound payload processing and each automated BC posting step.
 /// </summary>
 /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.14 Outbound Trigger Points / 5.15 Inbound Payload Processing / Interface 3.1 PO/TO/ProdPO
+/// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.1 to 6.5 (values 16-24)
 enum 50103 "IP Integration Event Type"
 {
     Extensible = true;
@@ -71,5 +72,41 @@ enum 50103 "IP Integration Event Type"
     value(15; "Transfer Order")
     {
         Caption = 'Transfer Order';
+    }
+    value(16; "ICR Movement Received")
+    {
+        Caption = 'ICR Movement Received';
+    }
+    value(17; "ICR Movement Validation")
+    {
+        Caption = 'ICR Movement Validation';
+    }
+    value(18; "Transfer Receipt")
+    {
+        Caption = 'Transfer Receipt';
+    }
+    value(19; "FG Transfer Order")
+    {
+        Caption = 'FG Transfer Order';
+    }
+    value(20; "FG Transfer Shipment")
+    {
+        Caption = 'FG Transfer Shipment';
+    }
+    value(21; "Transfer Shipment")
+    {
+        Caption = 'Transfer Shipment';
+    }
+    value(22; "Difarco Handoff")
+    {
+        Caption = 'Difarco Handoff';
+    }
+    value(23; "ICR Movement Processing")
+    {
+        Caption = 'ICR Movement Processing';
+    }
+    value(24; "Outbound Validation")
+    {
+        Caption = 'Outbound Validation';
     }
 }

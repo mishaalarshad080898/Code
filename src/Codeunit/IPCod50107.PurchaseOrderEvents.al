@@ -22,11 +22,14 @@ codeunit 50107 "IP Purchase Order Events"
     /// the PO is reopened so it never stays released without the filler having received it.
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - 5.6 Outbound Production Request Processing / 5.14 Outbound Trigger Points (PO Release - Send Production Request)
+    /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.1 Purchase Order Release (validation before payload generation)
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Release Purchase Document", 'OnAfterReleasePurchaseDoc', '', false, false)]
     local procedure ReleasePurchaseDocOnAfterRelease(var PurchaseHeader: Record "Purchase Header"; PreviewMode: Boolean)
     var
         OutboundProdRequest: Codeunit "IP Outbound Prod. Request";
         ICROrderMessage: Codeunit "IP ICR Order Message";
+        OrchValidation: Codeunit "IP Outbound Orch. Validation";
+        ValidationErrorText: Text;
     begin
         if PreviewMode then
             exit;
@@ -37,9 +40,15 @@ codeunit 50107 "IP Purchase Order Events"
         if PurchaseHeader."IP Filler Integration" then begin
             if not OutboundProdRequest.SendOnRelease(PurchaseHeader) then
                 ReopenAfterFailedSend(PurchaseHeader, OutboundProdRequest.GetLastFailureText());
-        end else
+        end else begin
+            // Inventory Orchestration 6.1: no payload is generated when the PO fails validation; the PO is reopened for correction.
+            if not OrchValidation.ValidatePurchaseOrderRelease(PurchaseHeader, ValidationErrorText) then begin
+                ReopenAfterFailedSend(PurchaseHeader, ValidationErrorText);
+                exit;
+            end;
             if not ICROrderMessage.SendPurchaseOrder(PurchaseHeader) then
                 ReopenAfterFailedSend(PurchaseHeader, ICROrderMessage.GetLastFailureText());
+        end;
     end;
 
     /// <summary>

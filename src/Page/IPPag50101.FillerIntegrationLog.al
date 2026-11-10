@@ -95,6 +95,10 @@ page 50101 "IP Filler Integration Log"
                 {
                     ToolTip = 'Specifies the inbound completion entry.';
                 }
+                field("ICR Movement Entry No."; Rec."ICR Movement Entry No.")
+                {
+                    ToolTip = 'Specifies the inbound ICR movement (goods receipt or finished goods shipment) this entry belongs to.';
+                }
                 field("HTTP Status Code"; Rec."HTTP Status Code")
                 {
                     ToolTip = 'Specifies the HTTP status returned by the filler endpoint.';

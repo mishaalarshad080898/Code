@@ -3,8 +3,8 @@
   "name": "IP ICR-MRP Filler Integration",
   "publisher": "Interparfums",
   "version": "1.0.0.0",
-  "brief": "Assembly Order / Purchase Order subcontracting orchestration for integrated fillers (ICR).",
-  "description": "Implements the Functional Design Document for ICR-MRP integration v3: Create PO Link, outbound production request and BOM transmission, inbound completion processing, partial completion, over-receipt, pricing validation, scrap posting, phantom lot (ADO 1507) assignment and the Filler Integration Activity Log.",
+  "brief": "Assembly Order / Purchase Order subcontracting orchestration and inventory distribution for integrated fillers (ICR).",
+  "description": "Implements the Functional Design Document for ICR-MRP integration v3: Create PO Link, outbound production request and BOM transmission, inbound completion processing, partial completion, over-receipt, pricing validation, scrap posting, phantom lot (ADO 1507) assignment and the Filler Integration Activity Log. Also implements the Functional Design Document for ICR - Inventory Orchestration: PO release and TO shipment trigger points, inbound ICR movements (030 goods receipt of POs / TOs, 311 finished goods transfer to the 3PL with phantom lot XXXX) and Difarco hand-off.",
   "privacyStatement": "",
   "EULA": "",
   "help": "",
@@ -18,6 +18,10 @@
     {
       "from": 50100,
       "to": 50149
+    },
+    {
+      "from": 50403,
+      "to": 50449
     }
   ],
   "resourceExposurePolicy": {

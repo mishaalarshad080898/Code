@@ -16,17 +16,24 @@ codeunit 50116 "IP Transfer Order Events"
     /// <summary>
     /// TO release trigger point: sends the ICR order message (Create on first release, Update when
     /// changed) for transfer orders to a filler location. Reopens the TO when the send fails.
+    /// Skipped when the filler's TO Outbound Trigger is Shipment (sent on shipment posting instead).
     /// </summary>
     /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Create, Update)
+    /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.2 Transfer Order Shipment to Integrated Filler
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Release Transfer Document", 'OnAfterReleaseTransferDoc', '', false, false)]
     local procedure ReleaseTransferDocOnAfterRelease(var TransferHeader: Record "Transfer Header")
     var
+        FillerSetup: Record "IP Filler Integration Setup";
         ICROrderMessage: Codeunit "IP ICR Order Message";
     begin
         if TransferHeader.IsTemporary() then
             exit;
         if Context.IsOutboundSuppressed() then
             exit;
+        // Inventory Orchestration 6.2: when the filler is set to send on shipment, release sends nothing.
+        if FillerSetup.GetEnabledByLocation(TransferHeader."Transfer-to Code") then
+            if FillerSetup."TO Outbound Trigger" = FillerSetup."TO Outbound Trigger"::Shipment then
+                exit;
         if not ICROrderMessage.SendTransferOrder(TransferHeader) then
             ReopenAfterFailedSend(TransferHeader, ICROrderMessage.GetLastFailureText());
     end;

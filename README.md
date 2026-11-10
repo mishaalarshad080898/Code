@@ -71,3 +71,53 @@ These choices fill gaps or contradictions raised in the FDD review comments. Con
 4. Set up the phantom lot on **Company Information**.
 5. Schedule a Job Queue Entry for codeunit **50111 IP Inbound Job Queue**.
 6. Point the middleware at `/api/interparfums/fillerIntegration/v1.0/companies({id})/fillerCompletions`.
+
+---
+
+# ICR Inventory Orchestration (FDD v1.2)
+
+Implements the **Functional Design Document for ICR - Inventory Orchestration** in the same extension (ID range 50403–50449), reusing Filler Integration Setup, the ICR order message, the transport and the Filler Integration Activity Log.
+Comments use `/// Comment - Functional Design Document for ICR - Inventory Orchestration - <FDD section>`.
+
+## Flow
+
+**Raw material distribution**
+1. PO release → validate vendor, filler setup and PO lines → send PO payload (ZRFE) → log. Validation failure: no payload, PO reopened for correction, logged.
+2. TO shipment posted to a filler location → validate → send TO payload → log. Inventory is in transit. A failure never undoes the shipment; it is logged and can be resent.
+3. ICR posts a **030 Goods Receipt** movement → BC finds the PO or inbound TO from `PO_NUMBER` → validates lines (`PO_ITEM`), items, UoM and quantities → posts the PO receipt (receive only) or the TO receipt → log.
+
+**Finished goods distribution**
+1. ICR posts a **311 Transfer to 3PL** movement.
+2. BC looks for an open TO from the filler location with the same items and quantities. If none, it creates one (filler location → 3PL location from setup).
+3. BC assigns lot `XXXX` to covered finished goods (Phantom Lot enabled, item Phantom Lot Covered) after checking stock under `XXXX`. The physical lot from the payload is kept for audit only.
+4. BC posts the Transfer Shipment. The existing Difarco integration receives it (unchanged).
+5. Every step is in the Activity Log.
+
+## Object map
+
+| FDD section | Objects |
+|---|---|
+| 6.1 Purchase Order Release | `IPCod50415.OutboundOrchValidation`, hook in `IPCod50107.PurchaseOrderEvents` |
+| 6.2 Transfer Order Shipment to Integrated Filler | `IPCod50416.TransferOrchEvents`, `IPEnum50410.TOOutboundTrigger`, setup field *TO Outbound Trigger*, hook in `IPCod50116.TransferOrderEvents` |
+| 6.3 Outbound Integration Trigger Points | `IPCod50415`, `IPCod50416`, existing `IPCod50115.ICROrderMessage` (payload, duplicate prevention) |
+| 6.4 Inbound Raw Material Receipt Processing | `IPTab50405.ICRMovementHeader`, `IPTab50406.ICRMovementLine`, `IPPag50410.ICRMovementAPI`, `IPPag50411.ICRMovementLineAPI`, `IPCod50417.ICRMovementProcessing`, `IPCod50418.ICRMovementPosting`, `IPCod50419.ICRMovementValidation`, `IPCod50420.RawMaterialReceipt`, `IPCod50424.ICRMovementJobQueue`, `IPEnum50408.ICRMovementType`, `IPEnum50409.MovementSourceDocType` |
+| 6.5 Finished Goods Shipment Processing | `IPCod50421.FGShipmentProcessing`, `IPCod50422.TransferPhantomLotMgt`, `IPTabExt50405–50408` (Transfer Header/Line, Transfer Shipment Header/Line), `IPPagExt50403.TransferOrder`, `IPPagExt50404.PostedTransferShipment`, setup fields *FG 3PL Location Code*, *FG In-Transit Code* |
+| 3.5 Operational Visibility | `IPCod50423.ICRMovementLogMgt`, `IPPag50412.ICRMovements`, `IPPag50413.ICRMovement`, `IPPag50414.ICRMovementSubform`, Activity Log field *ICR Movement Entry No.* |
+
+## Design decisions to confirm
+
+- **One app**: added to the existing extension so PO/TO payloads are not sent twice and the Activity Log stays in one place.
+- **TO trigger**: setup *TO Outbound Trigger* = Shipment (default, per this FDD) or Release (earlier ICR-MRP behavior).
+- **030 routing**: `PO_NUMBER` is looked up as a Purchase Order first, then a Transfer Order. Production POs linked to an AO are rejected here (they go through the ICR-MRP filler completion API).
+- **TO matching (311)**: same transfer-from location, same set of items, and the same open (unshipped) quantity per item in base UoM. Direct transfers are skipped.
+- **Filler for 311**: movement *Vendor No.*, else line `LIFNR`, else the only enabled filler.
+- **Duplicates**: same Message ID, or same `MVT_TYPE` + `PO_NUMBER` + `HDTEXT`, already processed.
+- **No double posting**: the movement is set to Processed in the same transaction as the BC posting.
+- **Physical lot**: optional line field `physicalLotNo`. Used for lot-tracked raw materials; ignored (audit only) for phantom-lot finished goods. A payload lot of `XXXX` while Phantom Lot is off is an error.
+- **Out of scope here**: movements 087, 100, 101, 122 are stored and rejected as not in scope. Warehouse receive/ship documents and bins are not handled.
+
+## Setup checklist (Inventory Orchestration)
+
+1. Filler Integration Setup: *TO Outbound Trigger*, *FG 3PL Location Code*, *FG In-Transit Code* (or a transfer route).
+2. Schedule a Job Queue Entry for codeunit **50424 IP ICR Movement Job Queue**.
+3. Point the middleware at `/api/interparfums/fillerIntegration/v1.0/companies({id})/icrMovements` (deep insert with `posd`).
