@@ -20,6 +20,7 @@ codeunit 50417 "IP ICR Movement Processing"
         ProcessedMsg: Label 'ICR movement %1 was processed.', Comment = '%1 = Entry No.';
         FailedMsg: Label 'ICR movement %1 could not be processed:\\%2', Comment = '%1 = Entry No., %2 = Error';
         DuplicateMsg: Label 'ICR movement %1 is a duplicate and was not processed.', Comment = '%1 = Entry No.';
+        NotOrchestrationErr: Label 'ICR inbound entry %1 (MVT_TYPE %2) is not an Inventory Orchestration entry. It is processed by the ICR-MRP inbound process (production PO completion, scrap or adjustment).', Comment = '%1 = Entry No., %2 = Movement type';
 
     /// <summary>
     /// Processes one movement. Duplicates are set to Duplicate. Otherwise the movement runs in its
@@ -27,10 +28,14 @@ codeunit 50417 "IP ICR Movement Processing"
     /// the error. Returns true when the movement was processed.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Failures prevent posting)
-    procedure ProcessEntry(var MovementHeader: Record "IP ICR Movement Header"): Boolean
+    procedure ProcessEntry(var MovementHeader: Record "IP ICR Inbound Entry Header"): Boolean
     var
         Success: Boolean;
     begin
+        // One inbound table serves both FDDs: only raw material receipts (030 without Assembly Order)
+        // and finished goods transfers (311) are processed here.
+        if not MovementHeader.IsInventoryOrchestration() then
+            Error(NotOrchestrationErr, MovementHeader."Entry No.", MovementHeader."Mvt Type");
         if MovementHeader.Status = MovementHeader.Status::Processed then
             exit(true);
         if MovementHeader.Status = MovementHeader.Status::Duplicate then
@@ -66,7 +71,7 @@ codeunit 50417 "IP ICR Movement Processing"
     /// is increased and kept in the Activity Log.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 5.2 Integration Assumptions (1) Payload failures may occur and require retry processing
-    procedure RetryEntry(var MovementHeader: Record "IP ICR Movement Header"): Boolean
+    procedure RetryEntry(var MovementHeader: Record "IP ICR Inbound Entry Header"): Boolean
     begin
         if MovementHeader.Status <> MovementHeader.Status::Exception then
             Error(RetryOnlyExceptionErr);
@@ -80,7 +85,7 @@ codeunit 50417 "IP ICR Movement Processing"
     /// Processes or retries a movement from the UI and shows the result.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility
-    procedure ProcessEntryWithMessage(var MovementHeader: Record "IP ICR Movement Header"; IsRetry: Boolean)
+    procedure ProcessEntryWithMessage(var MovementHeader: Record "IP ICR Inbound Entry Header"; IsRetry: Boolean)
     var
         Success: Boolean;
     begin
@@ -98,20 +103,23 @@ codeunit 50417 "IP ICR Movement Processing"
     end;
 
     /// <summary>
-    /// Processes all movements in status Received, oldest first. Used by the job queue.
+    /// Processes all Inventory Orchestration entries (030 without Assembly Order, 311) in status
+    /// Received, oldest first. Entries of the ICR-MRP process are left alone. Used by the job queue.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.2 Core Behavior (Validated inbound payloads initiate Business Central transaction processing)
     procedure ProcessReceivedEntries()
     var
-        MovementHeader: Record "IP ICR Movement Header";
+        MovementHeader: Record "IP ICR Inbound Entry Header";
         EntryNos: List of [Integer];
         EntryNo: Integer;
     begin
-        MovementHeader.SetCurrentKey(Status);
+        MovementHeader.SetCurrentKey(Status, "Mvt Type");
         MovementHeader.SetRange(Status, MovementHeader.Status::Received);
+        MovementHeader.SetFilter("Mvt Type", '%1|%2', '030', '311');
         if MovementHeader.FindSet() then
             repeat
-                EntryNos.Add(MovementHeader."Entry No.");
+                if MovementHeader.IsInventoryOrchestration() then
+                    EntryNos.Add(MovementHeader."Entry No.");
             until MovementHeader.Next() = 0;
 
         foreach EntryNo in EntryNos do
@@ -123,13 +131,13 @@ codeunit 50417 "IP ICR Movement Processing"
     /// Payload receipt is logged as soon as the middleware inserts the movement.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Receives payload / Activity is logged)
-    [EventSubscriber(ObjectType::Table, Database::"IP ICR Movement Header", 'OnAfterInsertEvent', '', false, false)]
-    local procedure MovementHeaderOnAfterInsert(var Rec: Record "IP ICR Movement Header")
+    [EventSubscriber(ObjectType::Table, Database::"IP ICR Inbound Entry Header", 'OnAfterInsertEvent', '', false, false)]
+    local procedure MovementHeaderOnAfterInsert(var Rec: Record "IP ICR Inbound Entry Header")
     begin
         if Rec.IsTemporary() then
             exit;
         MovementLogMgt.LogMovement(Rec, "IP Integration Event Type"::"ICR Movement Received", "IP Integration Status"::Success,
-            StrSubstNo(ReceivedTxt, Rec."Entry No.", Rec."Movement Type Code", Rec."PO Number", Rec."ICR Document No."), '');
+            StrSubstNo(ReceivedTxt, Rec."Entry No.", Rec."Mvt Type", Rec."PO Number", Rec."HD Text"), '');
     end;
 
     /// <summary>
@@ -138,7 +146,7 @@ codeunit 50417 "IP ICR Movement Processing"
     /// twice; only the error is logged.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.3 Outbound Integration Trigger Points (Records failures) / 6.4 (Failures prevent posting)
-    local procedure SetException(var MovementHeader: Record "IP ICR Movement Header"; ErrorText: Text)
+    local procedure SetException(var MovementHeader: Record "IP ICR Inbound Entry Header"; ErrorText: Text)
     begin
         if MovementHeader.Status = MovementHeader.Status::Processed then begin
             MovementLogMgt.LogMovement(MovementHeader, "IP Integration Event Type"::"ICR Movement Processing", "IP Integration Status"::Exception,

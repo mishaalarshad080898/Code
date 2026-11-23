@@ -7,7 +7,7 @@
 /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing / 6.5 Finished Goods Shipment Processing
 codeunit 50418 "IP ICR Movement Posting"
 {
-    TableNo = "IP ICR Movement Header";
+    TableNo = "IP ICR Inbound Entry Header";
 
     var
         Validation: Codeunit "IP ICR Movement Validation";
@@ -18,7 +18,7 @@ codeunit 50418 "IP ICR Movement Posting"
 
     trigger OnRun()
     var
-        MovementHeader: Record "IP ICR Movement Header";
+        MovementHeader: Record "IP ICR Inbound Entry Header";
     begin
         MovementHeader.Get(Rec."Entry No.");
         ProcessMovement(MovementHeader);
@@ -29,7 +29,7 @@ codeunit 50418 "IP ICR Movement Posting"
     /// Validates the payload and starts the BC transaction for its movement type.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Receives payload, Validates transaction, Processes receipt)
-    local procedure ProcessMovement(var MovementHeader: Record "IP ICR Movement Header")
+    local procedure ProcessMovement(var MovementHeader: Record "IP ICR Inbound Entry Header")
     begin
         Validation.ValidateHeaderAndLines(MovementHeader);
         case MovementHeader."Movement Type" of
@@ -45,7 +45,7 @@ codeunit 50418 "IP ICR Movement Posting"
     /// lines and quantities, then posts the receipt.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Purchase Order receipt OR Transfer Order receipt)
-    local procedure ProcessGoodsReceipt(var MovementHeader: Record "IP ICR Movement Header")
+    local procedure ProcessGoodsReceipt(var MovementHeader: Record "IP ICR Inbound Entry Header")
     begin
         Validation.ResolveGoodsReceiptSource(MovementHeader);
         MovementHeader.Modify();
@@ -69,7 +69,7 @@ codeunit 50418 "IP ICR Movement Posting"
     /// Logs the successful validation step.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Validates transaction / Updates Activity Log)
-    local procedure LogValidated(MovementHeader: Record "IP ICR Movement Header")
+    local procedure LogValidated(MovementHeader: Record "IP ICR Inbound Entry Header")
     begin
         MovementLogMgt.LogMovement(MovementHeader, "IP Integration Event Type"::"ICR Movement Validation", "IP Integration Status"::Success,
             StrSubstNo(ValidatedTxt, MovementHeader."Entry No.", MovementHeader."Source Document Type", MovementHeader."Source Document No."), '');

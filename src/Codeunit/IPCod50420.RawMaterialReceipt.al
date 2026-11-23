@@ -22,11 +22,11 @@ codeunit 50420 "IP Raw Material Receipt"
     /// transaction as the posting, so a committed receipt is never posted twice.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Purchase Order receipt / Processes receipt)
-    procedure PostPurchaseReceipt(var MovementHeader: Record "IP ICR Movement Header")
+    procedure PostPurchaseReceipt(var MovementHeader: Record "IP ICR Inbound Entry Header")
     var
         PurchaseHeader: Record "Purchase Header";
         PurchaseLine: Record "Purchase Line";
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         ReleasePurchaseDocument: Codeunit "Release Purchase Document";
         PurchPost: Codeunit "Purch.-Post";
     begin
@@ -44,11 +44,11 @@ codeunit 50420 "IP Raw Material Receipt"
                 PurchaseLine.Modify(true);
             until PurchaseLine.Next() = 0;
 
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
-            PurchaseLine.Get(PurchaseHeader."Document Type", PurchaseHeader."No.", MovementLine."PO Item");
-            PurchaseLine.Validate("Qty. to Receive", PurchaseLine."Qty. to Receive" + MovementLine.Quantity);
+            PurchaseLine.Get(PurchaseHeader."Document Type", PurchaseHeader."No.", MovementLine."Item Line No");
+            PurchaseLine.Validate("Qty. to Receive", PurchaseLine."Qty. to Receive" + MovementLine.Qty);
             PurchaseLine.Modify(true);
             AssignPurchaseLot(PurchaseLine, MovementLine);
         until MovementLine.Next() = 0;
@@ -66,6 +66,7 @@ codeunit 50420 "IP Raw Material Receipt"
 
         MovementHeader.Get(MovementHeader."Entry No.");
         MovementHeader."Posted Document No." := PurchaseHeader."Last Receiving No.";
+        MovementHeader."Posted Receipt No." := PurchaseHeader."Last Receiving No.";
         MovementHeader.Modify();
         LogPostedLines(MovementHeader, "IP Integration Event Type"::"PO Receipt");
         MovementLogMgt.LogMovement(MovementHeader, "IP Integration Event Type"::"PO Receipt", "IP Integration Status"::Success,
@@ -78,11 +79,11 @@ codeunit 50420 "IP Raw Material Receipt"
     /// Transfer Receipt into the filler location.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Transfer Order receipt / Processes receipt)
-    procedure PostTransferReceipt(var MovementHeader: Record "IP ICR Movement Header")
+    procedure PostTransferReceipt(var MovementHeader: Record "IP ICR Inbound Entry Header")
     var
         TransferHeader: Record "Transfer Header";
         TransferLine: Record "Transfer Line";
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         TransferPostReceipt: Codeunit "TransferOrder-Post Receipt";
     begin
         TransferHeader.Get(MovementHeader."Source Document No.");
@@ -96,11 +97,11 @@ codeunit 50420 "IP Raw Material Receipt"
                 TransferLine.Modify(true);
             until TransferLine.Next() = 0;
 
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
-            TransferLine.Get(TransferHeader."No.", MovementLine."PO Item");
-            TransferLine.Validate("Qty. to Receive", TransferLine."Qty. to Receive" + MovementLine.Quantity);
+            TransferLine.Get(TransferHeader."No.", MovementLine."Item Line No");
+            TransferLine.Validate("Qty. to Receive", TransferLine."Qty. to Receive" + MovementLine.Qty);
             TransferLine.Modify(true);
         until MovementLine.Next() = 0;
 
@@ -133,7 +134,7 @@ codeunit 50420 "IP Raw Material Receipt"
     /// (ADO 1507) never applies to raw materials and components.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.2 Core Behavior (Raw-material and component lot tracking remains unchanged)
-    local procedure AssignPurchaseLot(PurchaseLine: Record "Purchase Line"; MovementLine: Record "IP ICR Movement Line")
+    local procedure AssignPurchaseLot(PurchaseLine: Record "Purchase Line"; MovementLine: Record "IP ICR Inbound Entry Lines")
     var
         ForReservationEntry: Record "Reservation Entry";
         CreateReservEntry: Codeunit "Create Reserv. Entry";
@@ -143,42 +144,48 @@ codeunit 50420 "IP Raw Material Receipt"
             exit;
         if not LotMgt.IsLotTracked(PurchaseLine."No.") then
             exit;
-        QtyBase := Round(MovementLine.Quantity * PurchaseLine."Qty. per Unit of Measure", 0.00001);
+        QtyBase := Round(MovementLine.Qty * PurchaseLine."Qty. per Unit of Measure", 0.00001);
         ForReservationEntry."Lot No." := MovementLine."Physical Lot No.";
         CreateReservEntry.CreateReservEntryFor(
             Database::"Purchase Line", PurchaseLine."Document Type".AsInteger(), PurchaseLine."Document No.", '', 0, PurchaseLine."Line No.",
-            PurchaseLine."Qty. per Unit of Measure", MovementLine.Quantity, QtyBase, ForReservationEntry);
+            PurchaseLine."Qty. per Unit of Measure", MovementLine.Qty, QtyBase, ForReservationEntry);
         CreateReservEntry.CreateEntry(
             PurchaseLine."No.", PurchaseLine."Variant Code", PurchaseLine."Location Code", PurchaseLine.Description,
             PurchaseLine."Expected Receipt Date", 0D, 0, "Reservation Status"::Surplus);
     end;
 
     /// <summary>
-    /// Marks the movement Processed before the posting runs. Standard posting commits, so the
-    /// status and the receipt are committed together; a failed posting rolls both back.
+    /// Marks the entry Processed and its receipt step (header and lines) as posted before the posting
+    /// runs. Standard posting commits, so the flags and the receipt are committed together; a failed
+    /// posting rolls both back.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 5.2 Integration Assumptions (2) Duplicate transaction prevention is required
-    local procedure MarkProcessed(var MovementHeader: Record "IP ICR Movement Header")
+    local procedure MarkProcessed(var MovementHeader: Record "IP ICR Inbound Entry Header")
+    var
+        MovementLine: Record "IP ICR Inbound Entry Lines";
     begin
         MovementHeader.Status := MovementHeader.Status::Processed;
+        MovementHeader."Receipt Posted" := true;
         MovementHeader."Processed At" := CurrentDateTime();
         MovementHeader."Error Message" := '';
         MovementHeader.Modify();
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
+        MovementLine.ModifyAll("Receipt Posted", true);
     end;
 
     /// <summary>
     /// Logs one Activity Log entry per received payload line (quantity, item and price).
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Updates Activity Log)
-    local procedure LogPostedLines(MovementHeader: Record "IP ICR Movement Header"; EventType: Enum "IP Integration Event Type")
+    local procedure LogPostedLines(MovementHeader: Record "IP ICR Inbound Entry Header"; EventType: Enum "IP Integration Event Type")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
     begin
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         if MovementLine.FindSet() then
             repeat
                 MovementLogMgt.LogMovementLine(MovementHeader, MovementLine, EventType, "IP Integration Status"::Success,
-                    StrSubstNo(LineReceivedTxt, MovementLine.Quantity, MovementLine."Unit of Measure Code", MovementLine."Item No.", MovementLine."PO Item"), '');
+                    StrSubstNo(LineReceivedTxt, MovementLine.Qty, MovementLine."Unit of Measure", MovementLine."Item No.", MovementLine."Item Line No"), '');
             until MovementLine.Next() = 0;
     end;
 
@@ -186,12 +193,12 @@ codeunit 50420 "IP Raw Material Receipt"
     /// Returns the physical lot reported for a BC line, if any.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.2 Core Behavior (physical lot where required)
-    local procedure GetPhysicalLot(MovementHeader: Record "IP ICR Movement Header"; LineNo: Integer): Code[50]
+    local procedure GetPhysicalLot(MovementHeader: Record "IP ICR Inbound Entry Header"; LineNo: Integer): Code[50]
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
     begin
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
-        MovementLine.SetRange("PO Item", LineNo);
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Item Line No", LineNo);
         MovementLine.SetFilter("Physical Lot No.", '<>%1', '');
         if MovementLine.FindFirst() then
             exit(MovementLine."Physical Lot No.");
@@ -203,10 +210,10 @@ codeunit 50420 "IP Raw Material Receipt"
     /// number (HDTEXT).
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing
-    local procedure GetShipmentReference(MovementHeader: Record "IP ICR Movement Header"): Text
+    local procedure GetShipmentReference(MovementHeader: Record "IP ICR Inbound Entry Header"): Text
     begin
-        if MovementHeader."BOL No." <> '' then
-            exit(MovementHeader."BOL No.");
-        exit(MovementHeader."ICR Document No.");
+        if MovementHeader."D Number" <> '' then
+            exit(MovementHeader."D Number");
+        exit(MovementHeader."HD Text");
     end;
 }

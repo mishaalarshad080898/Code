@@ -39,9 +39,9 @@ codeunit 50419 "IP ICR Movement Validation"
     /// number (HDTEXT).
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 5.2 Integration Assumptions (2) Duplicate transaction prevention is required
-    procedure IsDuplicate(MovementHeader: Record "IP ICR Movement Header"): Boolean
+    procedure IsDuplicate(MovementHeader: Record "IP ICR Inbound Entry Header"): Boolean
     var
-        OtherMovement: Record "IP ICR Movement Header";
+        OtherMovement: Record "IP ICR Inbound Entry Header";
     begin
         OtherMovement.SetFilter("Entry No.", '<>%1', MovementHeader."Entry No.");
         OtherMovement.SetRange(Status, OtherMovement.Status::Processed);
@@ -51,11 +51,11 @@ codeunit 50419 "IP ICR Movement Validation"
                 exit(true);
             OtherMovement.SetRange("Message ID");
         end;
-        if MovementHeader."ICR Document No." = '' then
+        if MovementHeader."HD Text" = '' then
             exit(false);
-        OtherMovement.SetRange("Movement Type Code", MovementHeader."Movement Type Code");
+        OtherMovement.SetRange("Mvt Type", MovementHeader."Mvt Type");
         OtherMovement.SetRange("PO Number", MovementHeader."PO Number");
-        OtherMovement.SetRange("ICR Document No.", MovementHeader."ICR Document No.");
+        OtherMovement.SetRange("HD Text", MovementHeader."HD Text");
         exit(not OtherMovement.IsEmpty());
     end;
 
@@ -65,34 +65,34 @@ codeunit 50419 "IP ICR Movement Validation"
     /// unit of measure.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Required information) / 6.5 (Items, Quantities)
-    procedure ValidateHeaderAndLines(MovementHeader: Record "IP ICR Movement Header")
+    procedure ValidateHeaderAndLines(MovementHeader: Record "IP ICR Inbound Entry Header")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         Item: Record Item;
         ItemUnitOfMeasure: Record "Item Unit of Measure";
     begin
         if MovementHeader."Movement Type" = MovementHeader."Movement Type"::" " then
-            Error(UnknownMovementTypeErr, MovementHeader."Entry No.", MovementHeader."Movement Type Code");
+            Error(UnknownMovementTypeErr, MovementHeader."Entry No.", MovementHeader."Mvt Type");
         if not (MovementHeader."Movement Type" in [MovementHeader."Movement Type"::"Goods Receipt", MovementHeader."Movement Type"::"Transfer to 3PL"]) then
             Error(NotInScopeErr, MovementHeader."Movement Type");
         if (MovementHeader."Movement Type" = MovementHeader."Movement Type"::"Goods Receipt") and (MovementHeader."PO Number" = '') then
             Error(PONumberMissingErr, MovementHeader."Entry No.");
 
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         if not MovementLine.FindSet() then
             Error(NoLinesErr, MovementHeader."Entry No.");
         repeat
             if MovementLine."Item No." = '' then
-                Error(LineFieldMissingErr, MovementLine.FieldCaption("Item No."), MovementLine."Line No.", MovementHeader."Entry No.");
-            if MovementLine.Quantity <= 0 then
-                Error(LineQtyErr, MovementLine."Line No.", MovementHeader."Entry No.");
+                Error(LineFieldMissingErr, MovementLine.FieldCaption("Item No."), MovementLine."Entry No.", MovementHeader."Entry No.");
+            if MovementLine.Qty <= 0 then
+                Error(LineQtyErr, MovementLine."Entry No.", MovementHeader."Entry No.");
             if not Item.Get(MovementLine."Item No.") then
-                Error(ItemMissingErr, MovementLine."Item No.", MovementLine."Line No.", MovementHeader."Entry No.");
-            if MovementLine."Unit of Measure Code" <> '' then
-                if not ItemUnitOfMeasure.Get(MovementLine."Item No.", MovementLine."Unit of Measure Code") then
-                    Error(UOMMissingErr, MovementLine."Unit of Measure Code", MovementLine."Item No.");
-            if (MovementHeader."Movement Type" = MovementHeader."Movement Type"::"Goods Receipt") and (MovementLine."PO Item" = 0) then
-                Error(LineFieldMissingErr, MovementLine.FieldCaption("PO Item"), MovementLine."Line No.", MovementHeader."Entry No.");
+                Error(ItemMissingErr, MovementLine."Item No.", MovementLine."Entry No.", MovementHeader."Entry No.");
+            if MovementLine."Unit of Measure" <> '' then
+                if not ItemUnitOfMeasure.Get(MovementLine."Item No.", MovementLine."Unit of Measure") then
+                    Error(UOMMissingErr, MovementLine."Unit of Measure", MovementLine."Item No.");
+            if (MovementHeader."Movement Type" = MovementHeader."Movement Type"::"Goods Receipt") and (MovementLine."Item Line No" = 0) then
+                Error(LineFieldMissingErr, MovementLine.FieldCaption("Item Line No"), MovementLine."Entry No.", MovementHeader."Entry No.");
         until MovementLine.Next() = 0;
     end;
 
@@ -102,7 +102,7 @@ codeunit 50419 "IP ICR Movement Validation"
     /// source document and filler vendor on the movement.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Purchase Order receipt OR Transfer Order receipt / Document existence)
-    procedure ResolveGoodsReceiptSource(var MovementHeader: Record "IP ICR Movement Header")
+    procedure ResolveGoodsReceiptSource(var MovementHeader: Record "IP ICR Inbound Entry Header")
     var
         PurchaseHeader: Record "Purchase Header";
         TransferHeader: Record "Transfer Header";
@@ -137,26 +137,26 @@ codeunit 50419 "IP ICR Movement Validation"
     /// line is not more than the outstanding quantity.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Validate: Document existence, Quantities)
-    procedure ValidatePurchaseReceipt(MovementHeader: Record "IP ICR Movement Header")
+    procedure ValidatePurchaseReceipt(MovementHeader: Record "IP ICR Inbound Entry Header")
     var
         FillerSetup: Record "IP Filler Integration Setup";
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         PurchaseLine: Record "Purchase Line";
         QtyPerLine: Dictionary of [Integer, Decimal];
         LineNo: Integer;
     begin
         FillerSetup.Get(MovementHeader."Vendor No.");
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
-            if not PurchaseLine.Get(PurchaseLine."Document Type"::Order, MovementHeader."Source Document No.", MovementLine."PO Item") then
-                Error(DocLineNotFoundErr, MovementLine."PO Item", PurchaseOrderTxt, MovementHeader."Source Document No.");
+            if not PurchaseLine.Get(PurchaseLine."Document Type"::Order, MovementHeader."Source Document No.", MovementLine."Item Line No") then
+                Error(DocLineNotFoundErr, MovementLine."Item Line No", PurchaseOrderTxt, MovementHeader."Source Document No.");
             if (PurchaseLine.Type <> PurchaseLine.Type::Item) or (PurchaseLine."No." <> MovementLine."Item No.") then
                 Error(DocLineItemErr, PurchaseLine."Line No.", PurchaseOrderTxt, PurchaseLine."Document No.", PurchaseLine."No.", MovementLine."Item No.");
             if PurchaseLine."Location Code" <> FillerSetup."Filler Location Code" then
                 Error(DocLineLocationErr, PurchaseLine."Line No.", PurchaseLine."Document No.", PurchaseLine."Location Code", FillerSetup."Filler Location Code");
             CheckUnitOfMeasure(MovementLine, PurchaseLine."Unit of Measure Code", PurchaseLine."Line No.", PurchaseOrderTxt, PurchaseLine."Document No.");
-            AddQuantity(QtyPerLine, PurchaseLine."Line No.", MovementLine.Quantity);
+            AddQuantity(QtyPerLine, PurchaseLine."Line No.", MovementLine.Qty);
         until MovementLine.Next() = 0;
 
         foreach LineNo in QtyPerLine.Keys() do begin
@@ -172,22 +172,22 @@ codeunit 50419 "IP ICR Movement Validation"
     /// in transit.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Validate: Document existence, Quantities)
-    procedure ValidateTransferReceipt(MovementHeader: Record "IP ICR Movement Header")
+    procedure ValidateTransferReceipt(MovementHeader: Record "IP ICR Inbound Entry Header")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         TransferLine: Record "Transfer Line";
         QtyPerLine: Dictionary of [Integer, Decimal];
         LineNo: Integer;
     begin
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
-            if not TransferLine.Get(MovementHeader."Source Document No.", MovementLine."PO Item") then
-                Error(DocLineNotFoundErr, MovementLine."PO Item", TransferOrderTxt, MovementHeader."Source Document No.");
+            if not TransferLine.Get(MovementHeader."Source Document No.", MovementLine."Item Line No") then
+                Error(DocLineNotFoundErr, MovementLine."Item Line No", TransferOrderTxt, MovementHeader."Source Document No.");
             if TransferLine."Item No." <> MovementLine."Item No." then
                 Error(DocLineItemErr, TransferLine."Line No.", TransferOrderTxt, TransferLine."Document No.", TransferLine."Item No.", MovementLine."Item No.");
             CheckUnitOfMeasure(MovementLine, TransferLine."Unit of Measure Code", TransferLine."Line No.", TransferOrderTxt, TransferLine."Document No.");
-            AddQuantity(QtyPerLine, TransferLine."Line No.", MovementLine.Quantity);
+            AddQuantity(QtyPerLine, TransferLine."Line No.", MovementLine.Qty);
         until MovementLine.Next() = 0;
 
         foreach LineNo in QtyPerLine.Keys() do begin
@@ -203,13 +203,13 @@ codeunit 50419 "IP ICR Movement Validation"
     /// enabled filler. Checks that the filler location and the 3PL destination are set up.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Validate: Destination)
-    procedure ResolveFillerSetup(var MovementHeader: Record "IP ICR Movement Header"; var FillerSetup: Record "IP Filler Integration Setup")
+    procedure ResolveFillerSetup(var MovementHeader: Record "IP ICR Inbound Entry Header"; var FillerSetup: Record "IP Filler Integration Setup")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         Location: Record Location;
     begin
         if MovementHeader."Vendor No." = '' then begin
-            MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+            MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
             MovementLine.SetFilter("Vendor No.", '<>%1', '');
             if MovementLine.FindFirst() then
                 MovementHeader."Vendor No." := MovementLine."Vendor No.";
@@ -239,26 +239,26 @@ codeunit 50419 "IP ICR Movement Validation"
     /// the base unit of measure.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Quantity match)
-    procedure GetQuantityBase(MovementLine: Record "IP ICR Movement Line"): Decimal
+    procedure GetQuantityBase(MovementLine: Record "IP ICR Inbound Entry Lines"): Decimal
     var
         Item: Record Item;
     begin
         Item.Get(MovementLine."Item No.");
-        if MovementLine."Unit of Measure Code" = '' then
-            exit(MovementLine.Quantity);
-        exit(Round(MovementLine.Quantity * UOMMgt.GetQtyPerUnitOfMeasure(Item, MovementLine."Unit of Measure Code"), UOMMgt.QtyRndPrecision()));
+        if MovementLine."Unit of Measure" = '' then
+            exit(MovementLine.Qty);
+        exit(Round(MovementLine.Qty * UOMMgt.GetQtyPerUnitOfMeasure(Item, MovementLine."Unit of Measure"), UOMMgt.QtyRndPrecision()));
     end;
 
     /// <summary>
     /// The ICR unit of measure (MEINS), when sent, must be the unit of measure of the BC line.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Quantities)
-    local procedure CheckUnitOfMeasure(MovementLine: Record "IP ICR Movement Line"; LineUnitOfMeasureCode: Code[10]; LineNo: Integer; DocTypeText: Text; DocNo: Code[20])
+    local procedure CheckUnitOfMeasure(MovementLine: Record "IP ICR Inbound Entry Lines"; LineUnitOfMeasureCode: Code[10]; LineNo: Integer; DocTypeText: Text; DocNo: Code[20])
     begin
-        if MovementLine."Unit of Measure Code" = '' then
+        if MovementLine."Unit of Measure" = '' then
             exit;
-        if MovementLine."Unit of Measure Code" <> LineUnitOfMeasureCode then
-            Error(DocLineUOMErr, LineNo, DocTypeText, DocNo, LineUnitOfMeasureCode, MovementLine."Unit of Measure Code");
+        if MovementLine."Unit of Measure" <> LineUnitOfMeasureCode then
+            Error(DocLineUOMErr, LineNo, DocTypeText, DocNo, LineUnitOfMeasureCode, MovementLine."Unit of Measure");
     end;
 
     /// <summary>

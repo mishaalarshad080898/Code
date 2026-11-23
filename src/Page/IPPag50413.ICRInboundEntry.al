@@ -3,12 +3,12 @@
 /// movement that is not processed yet can be corrected here before it is processed or retried.
 /// </summary>
 /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility / 6.4 / 6.5
-page 50413 "IP ICR Movement"
+page 50413 "IP ICR Inbound Entry"
 {
-    Caption = 'ICR Movement';
+    Caption = 'ICR Inbound Entry';
     PageType = Card;
     ApplicationArea = All;
-    SourceTable = "IP ICR Movement Header";
+    SourceTable = "IP ICR Inbound Entry Header";
     InsertAllowed = false;
 
     layout
@@ -29,7 +29,7 @@ page 50413 "IP ICR Movement"
                 {
                     ToolTip = 'Specifies the message ID of the payload.';
                 }
-                field("Movement Type Code"; Rec."Movement Type Code")
+                field("Mvt Type"; Rec."Mvt Type")
                 {
                     ToolTip = 'Specifies the ICR movement type code (MVT_TYPE).';
                 }
@@ -41,11 +41,11 @@ page 50413 "IP ICR Movement"
                 {
                     ToolTip = 'Specifies the BC order number sent by ICR (PO_NUMBER).';
                 }
-                field("ICR Document No."; Rec."ICR Document No.")
+                field("HD Text"; Rec."HD Text")
                 {
                     ToolTip = 'Specifies the document number in the ICR system (HDTEXT).';
                 }
-                field("BOL No."; Rec."BOL No.")
+                field("D Number"; Rec."D Number")
                 {
                     ToolTip = 'Specifies the bill of lading (D_NUMBER).';
                 }
@@ -69,6 +69,30 @@ page 50413 "IP ICR Movement"
                 field(Status; Rec.Status)
                 {
                     ToolTip = 'Specifies the processing status of the movement.';
+                }
+                field("Assembly Order No."; Rec."Assembly Order No.")
+                {
+                    ToolTip = 'Specifies the Assembly Order of the production PO (ICR-MRP entries only).';
+                }
+                field("Receipt Posted"; Rec."Receipt Posted")
+                {
+                    ToolTip = 'Specifies whether the receipt step was posted.';
+                }
+                field("Output Posted"; Rec."Output Posted")
+                {
+                    ToolTip = 'Specifies whether the assembly output step was posted (ICR-MRP entries only).';
+                }
+                field("Scrap Posted"; Rec."Scrap Posted")
+                {
+                    ToolTip = 'Specifies whether the scrap step was posted (ICR-MRP entries only).';
+                }
+                field("Posted Receipt No."; Rec."Posted Receipt No.")
+                {
+                    ToolTip = 'Specifies the posted purchase receipt.';
+                }
+                field("Posted Assembly No."; Rec."Posted Assembly No.")
+                {
+                    ToolTip = 'Specifies the posted assembly order (ICR-MRP entries only).';
                 }
                 field("Source Document Type"; Rec."Source Document Type")
                 {
@@ -104,10 +128,10 @@ page 50413 "IP ICR Movement"
                     ToolTip = 'Specifies why the movement could not be processed.';
                 }
             }
-            part(Lines; "IP ICR Movement Subform")
+            part(Lines; "IP ICR Inbound Entry Subform")
             {
                 Caption = 'Lines (posd)';
-                SubPageLink = "Entry No." = field("Entry No.");
+                SubPageLink = "Inbound Header Entry No." = field("Entry No.");
                 Editable = IsEditable;
             }
         }
@@ -155,7 +179,7 @@ page 50413 "IP ICR Movement"
                 Caption = 'Filler Integration Activity Log';
                 Image = Log;
                 RunObject = page "IP Filler Integration Log";
-                RunPageLink = "ICR Movement Entry No." = field("Entry No.");
+                RunPageLink = "ICR Inbound Entry No." = field("Entry No.");
                 ToolTip = 'Open the Activity Log entries of this movement.';
             }
             action(SourceDocument)

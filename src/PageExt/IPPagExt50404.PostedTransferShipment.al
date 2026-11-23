@@ -14,7 +14,7 @@ pageextension 50404 "IP Posted Transfer Shipment" extends "Posted Transfer Shipm
                 ApplicationArea = All;
                 ToolTip = 'Specifies whether the transfer order was created from an ICR finished goods shipment payload.';
             }
-            field("IP ICR Movement Entry No."; Rec."IP ICR Movement Entry No.")
+            field("IP ICR Inbound Entry No."; Rec."IP ICR Inbound Entry No.")
             {
                 ApplicationArea = All;
                 ToolTip = 'Specifies the ICR movement this shipment was posted from.';
@@ -31,8 +31,8 @@ pageextension 50404 "IP Posted Transfer Shipment" extends "Posted Transfer Shipm
                 ApplicationArea = All;
                 Caption = 'ICR Movement';
                 Image = Inventory;
-                RunObject = page "IP ICR Movement";
-                RunPageLink = "Entry No." = field("IP ICR Movement Entry No.");
+                RunObject = page "IP ICR Inbound Entry";
+                RunPageLink = "Entry No." = field("IP ICR Inbound Entry No.");
                 ToolTip = 'Open the ICR movement this shipment was posted from.';
             }
         }

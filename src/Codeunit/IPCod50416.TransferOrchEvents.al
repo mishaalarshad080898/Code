@@ -64,7 +64,7 @@ codeunit 50416 "IP Transfer Orch. Events"
     [EventSubscriber(ObjectType::Table, Database::"Transfer Shipment Header", 'OnAfterCopyFromTransferHeader', '', false, false)]
     local procedure TransferShipmentHeaderOnAfterCopyFromTransferHeader(var TransferShipmentHeader: Record "Transfer Shipment Header"; TransferHeader: Record "Transfer Header")
     begin
-        TransferShipmentHeader."IP ICR Movement Entry No." := TransferHeader."IP ICR Movement Entry No.";
+        TransferShipmentHeader."IP ICR Inbound Entry No." := TransferHeader."IP ICR Inbound Entry No.";
         TransferShipmentHeader."IP Created by ICR Movement" := TransferHeader."IP Created by ICR Movement";
     end;
 

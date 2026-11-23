@@ -144,7 +144,7 @@ page 50100 "IP Filler Integration Setup"
             {
                 Caption = 'ICR Movements';
                 Image = Inventory;
-                RunObject = page "IP ICR Movements";
+                RunObject = page "IP ICR Inbound Entries";
                 RunPageLink = "Vendor No." = field("Vendor No.");
                 ToolTip = 'Open the inbound ICR movements (goods receipts and finished goods shipments) received from this filler.';
             }

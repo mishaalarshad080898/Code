@@ -10,7 +10,7 @@ codeunit 50423 "IP ICR Movement Log Mgt"
     /// Logs a header-level step of an inbound ICR movement and returns the log Entry No.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility (Filler Integration Activity Log)
-    procedure LogMovement(MovementHeader: Record "IP ICR Movement Header"; EventType: Enum "IP Integration Event Type"; Status: Enum "IP Integration Status"; Description: Text; ErrorText: Text): Integer
+    procedure LogMovement(MovementHeader: Record "IP ICR Inbound Entry Header"; EventType: Enum "IP Integration Event Type"; Status: Enum "IP Integration Status"; Description: Text; ErrorText: Text): Integer
     var
         IntegrationLog: Record "IP Filler Integration Log";
     begin
@@ -23,13 +23,13 @@ codeunit 50423 "IP ICR Movement Log Mgt"
     /// and returns the log Entry No. The physical lot is kept here for audit visibility only.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (physical lot retained in the activity log)
-    procedure LogMovementLine(MovementHeader: Record "IP ICR Movement Header"; MovementLine: Record "IP ICR Movement Line"; EventType: Enum "IP Integration Event Type"; Status: Enum "IP Integration Status"; Description: Text; ErrorText: Text): Integer
+    procedure LogMovementLine(MovementHeader: Record "IP ICR Inbound Entry Header"; MovementLine: Record "IP ICR Inbound Entry Lines"; EventType: Enum "IP Integration Event Type"; Status: Enum "IP Integration Status"; Description: Text; ErrorText: Text): Integer
     var
         IntegrationLog: Record "IP Filler Integration Log";
     begin
         InitMovementLog(IntegrationLog, MovementHeader, EventType);
-        IntegrationLog."Purchase Order Line No." := MovementLine."PO Item";
-        IntegrationLog.Quantity := MovementLine.Quantity;
+        IntegrationLog."Purchase Order Line No." := MovementLine."Item Line No";
+        IntegrationLog.Quantity := MovementLine.Qty;
         IntegrationLog."Unit Price" := MovementLine.GetUnitPrice();
         IntegrationLog."Physical Lot No." := MovementLine."Physical Lot No.";
         exit(InsertLog(IntegrationLog, Status, Description, ErrorText));
@@ -61,14 +61,14 @@ codeunit 50423 "IP ICR Movement Log Mgt"
     /// was posted against.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility
-    local procedure InitMovementLog(var IntegrationLog: Record "IP Filler Integration Log"; MovementHeader: Record "IP ICR Movement Header"; EventType: Enum "IP Integration Event Type")
+    local procedure InitMovementLog(var IntegrationLog: Record "IP Filler Integration Log"; MovementHeader: Record "IP ICR Inbound Entry Header"; EventType: Enum "IP Integration Event Type")
     begin
         IntegrationLog.Init();
         IntegrationLog."Entry No." := 0;
         IntegrationLog.Direction := IntegrationLog.Direction::Inbound;
         IntegrationLog."Event Type" := EventType;
         IntegrationLog."Vendor No." := MovementHeader."Vendor No.";
-        IntegrationLog."ICR Movement Entry No." := MovementHeader."Entry No.";
+        IntegrationLog."ICR Inbound Entry No." := MovementHeader."Entry No.";
         IntegrationLog."Message ID" := MovementHeader."Message ID";
         IntegrationLog."Payload Timestamp" := MovementHeader."Received At";
         IntegrationLog."Retry Count" := MovementHeader."Retry Count";

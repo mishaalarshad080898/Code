@@ -25,7 +25,7 @@ codeunit 50421 "IP FG Shipment Processing"
     /// hand off to Difarco.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Business Central Behavior)
-    procedure ProcessShipment(var MovementHeader: Record "IP ICR Movement Header")
+    procedure ProcessShipment(var MovementHeader: Record "IP ICR Inbound Entry Header")
     var
         FillerSetup: Record "IP Filler Integration Setup";
         TransferHeader: Record "Transfer Header";
@@ -50,8 +50,8 @@ codeunit 50421 "IP FG Shipment Processing"
         TransferHeader.Get(TransferHeader."No.");
         TransferHeader."Posting Date" := MovementHeader."Posting Date";
         if TransferHeader."External Document No." = '' then
-            TransferHeader."External Document No." := CopyStr(MovementHeader."BOL No.", 1, MaxStrLen(TransferHeader."External Document No."));
-        TransferHeader."IP ICR Movement Entry No." := MovementHeader."Entry No.";
+            TransferHeader."External Document No." := CopyStr(MovementHeader."D Number", 1, MaxStrLen(TransferHeader."External Document No."));
+        TransferHeader."IP ICR Inbound Entry No." := MovementHeader."Entry No.";
         TransferHeader.Modify(true);
 
         // Marked Processed before posting: the shipment posting commits status and shipment together.
@@ -80,7 +80,7 @@ codeunit 50421 "IP FG Shipment Processing"
     /// receipt.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Find existing Transfer Order that matches: Transfer from, Item(s), Quantity)
-    local procedure FindMatchingTransferOrder(MovementHeader: Record "IP ICR Movement Header"; FillerSetup: Record "IP Filler Integration Setup"; var TransferHeader: Record "Transfer Header"): Boolean
+    local procedure FindMatchingTransferOrder(MovementHeader: Record "IP ICR Inbound Entry Header"; FillerSetup: Record "IP Filler Integration Setup"; var TransferHeader: Record "Transfer Header"): Boolean
     var
         MovementQty: Dictionary of [Code[20], Decimal];
     begin
@@ -100,9 +100,9 @@ codeunit 50421 "IP FG Shipment Processing"
     /// location from setup or the transfer route), one line per payload line.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (If Transfer Order not found create new Transfer Order)
-    local procedure CreateTransferOrder(MovementHeader: Record "IP ICR Movement Header"; FillerSetup: Record "IP Filler Integration Setup"; var TransferHeader: Record "Transfer Header")
+    local procedure CreateTransferOrder(MovementHeader: Record "IP ICR Inbound Entry Header"; FillerSetup: Record "IP Filler Integration Setup"; var TransferHeader: Record "Transfer Header")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         TransferLine: Record "Transfer Line";
         LineNo: Integer;
     begin
@@ -116,12 +116,12 @@ codeunit 50421 "IP FG Shipment Processing"
         TransferHeader.TestField("In-Transit Code");
         TransferHeader.Validate("Posting Date", MovementHeader."Posting Date");
         TransferHeader.Validate("Shipment Date", MovementHeader."Posting Date");
-        TransferHeader."External Document No." := CopyStr(MovementHeader."BOL No.", 1, MaxStrLen(TransferHeader."External Document No."));
-        TransferHeader."IP ICR Movement Entry No." := MovementHeader."Entry No.";
+        TransferHeader."External Document No." := CopyStr(MovementHeader."D Number", 1, MaxStrLen(TransferHeader."External Document No."));
+        TransferHeader."IP ICR Inbound Entry No." := MovementHeader."Entry No.";
         TransferHeader."IP Created by ICR Movement" := true;
         TransferHeader.Modify(true);
 
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
             LineNo += 10000;
@@ -129,9 +129,9 @@ codeunit 50421 "IP FG Shipment Processing"
             TransferLine."Document No." := TransferHeader."No.";
             TransferLine."Line No." := LineNo;
             TransferLine.Validate("Item No.", MovementLine."Item No.");
-            if MovementLine."Unit of Measure Code" <> '' then
-                TransferLine.Validate("Unit of Measure Code", MovementLine."Unit of Measure Code");
-            TransferLine.Validate(Quantity, MovementLine.Quantity);
+            if MovementLine."Unit of Measure" <> '' then
+                TransferLine.Validate("Unit of Measure Code", MovementLine."Unit of Measure");
+            TransferLine.Validate(Quantity, MovementLine.Qty);
             TransferLine."IP Physical Lot No." := MovementLine."Physical Lot No.";
             TransferLine.Insert(true);
         until MovementLine.Next() = 0;
@@ -142,9 +142,9 @@ codeunit 50421 "IP FG Shipment Processing"
     /// the shipped quantity is posted; quantities are allocated per item over the open lines.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Posts Transfer Shipment - quantities unchanged by ADO 1507)
-    local procedure SetQuantityToShip(MovementHeader: Record "IP ICR Movement Header"; TransferHeader: Record "Transfer Header")
+    local procedure SetQuantityToShip(MovementHeader: Record "IP ICR Inbound Entry Header"; TransferHeader: Record "Transfer Header")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         TransferLine: Record "Transfer Line";
         RemainingBase: Decimal;
         OpenBase: Decimal;
@@ -160,7 +160,7 @@ codeunit 50421 "IP FG Shipment Processing"
             until TransferLine.Next() = 0;
         TransferLine.SetRange("Qty. to Ship");
 
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         MovementLine.FindSet();
         repeat
             RemainingBase := Validation.GetQuantityBase(MovementLine);
@@ -189,10 +189,10 @@ codeunit 50421 "IP FG Shipment Processing"
     /// covered finished goods) and logs it with the physical lot for audit visibility.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (ADO 1507 Phantom Lot)
-    local procedure AssignTracking(MovementHeader: Record "IP ICR Movement Header"; TransferHeader: Record "Transfer Header")
+    local procedure AssignTracking(MovementHeader: Record "IP ICR Inbound Entry Header"; TransferHeader: Record "Transfer Header")
     var
         TransferLine: Record "Transfer Line";
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
         Description: Text;
     begin
         TransferLine.SetRange("Document No.", TransferHeader."No.");
@@ -204,7 +204,7 @@ codeunit 50421 "IP FG Shipment Processing"
                 if Description <> '' then begin
                     MovementLine.Init();
                     MovementLine."Item No." := TransferLine."Item No.";
-                    MovementLine.Quantity := TransferLine."Qty. to Ship";
+                    MovementLine.Qty := TransferLine."Qty. to Ship";
                     MovementLine."Physical Lot No." := TransferLine."IP Physical Lot No.";
                     MovementLogMgt.LogMovementLine(MovementHeader, MovementLine, "IP Integration Event Type"::"Phantom Lot Assignment", "IP Integration Status"::Success, Description, '');
                 end;
@@ -215,11 +215,11 @@ codeunit 50421 "IP FG Shipment Processing"
     /// Builds the payload quantity per item in the base unit of measure.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Item(s), Quantity)
-    local procedure GetMovementQuantities(MovementHeader: Record "IP ICR Movement Header"; var MovementQty: Dictionary of [Code[20], Decimal])
+    local procedure GetMovementQuantities(MovementHeader: Record "IP ICR Inbound Entry Header"; var MovementQty: Dictionary of [Code[20], Decimal])
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
     begin
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         if MovementLine.FindSet() then
             repeat
                 AddQuantity(MovementQty, MovementLine."Item No.", Validation.GetQuantityBase(MovementLine));
@@ -262,7 +262,7 @@ codeunit 50421 "IP FG Shipment Processing"
     /// Stores the Transfer Order on the movement as its source document.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Activity is logged)
-    local procedure SetSourceDocument(var MovementHeader: Record "IP ICR Movement Header"; TransferOrderNo: Code[20]; Created: Boolean)
+    local procedure SetSourceDocument(var MovementHeader: Record "IP ICR Inbound Entry Header"; TransferOrderNo: Code[20]; Created: Boolean)
     begin
         MovementHeader."Source Document Type" := MovementHeader."Source Document Type"::"FG Transfer Order";
         MovementHeader."Source Document No." := TransferOrderNo;
@@ -274,15 +274,15 @@ codeunit 50421 "IP FG Shipment Processing"
     /// Logs one Activity Log entry per shipped payload line, including the physical filler lot.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.5 Finished Goods Shipment Processing (Records Activity Log)
-    local procedure LogShippedLines(MovementHeader: Record "IP ICR Movement Header")
+    local procedure LogShippedLines(MovementHeader: Record "IP ICR Inbound Entry Header")
     var
-        MovementLine: Record "IP ICR Movement Line";
+        MovementLine: Record "IP ICR Inbound Entry Lines";
     begin
-        MovementLine.SetRange("Entry No.", MovementHeader."Entry No.");
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
         if MovementLine.FindSet() then
             repeat
                 MovementLogMgt.LogMovementLine(MovementHeader, MovementLine, "IP Integration Event Type"::"FG Transfer Shipment", "IP Integration Status"::Success,
-                    StrSubstNo(LineShippedTxt, MovementLine.Quantity, MovementLine."Unit of Measure Code", MovementLine."Item No."), '');
+                    StrSubstNo(LineShippedTxt, MovementLine.Qty, MovementLine."Unit of Measure", MovementLine."Item No."), '');
             until MovementLine.Next() = 0;
     end;
 

@@ -100,11 +100,13 @@ Comments use `/// Comment - Functional Design Document for ICR - Inventory Orche
 | 6.1 Purchase Order Release | `IPCod50415.OutboundOrchValidation`, hook in `IPCod50107.PurchaseOrderEvents` |
 | 6.2 Transfer Order Shipment to Integrated Filler | `IPCod50416.TransferOrchEvents`, `IPEnum50410.TOOutboundTrigger`, setup field *TO Outbound Trigger*, hook in `IPCod50116.TransferOrderEvents` |
 | 6.3 Outbound Integration Trigger Points | `IPCod50415`, `IPCod50416`, existing `IPCod50115.ICROrderMessage` (payload, duplicate prevention) |
-| 6.4 Inbound Raw Material Receipt Processing | `IPTab50405.ICRMovementHeader`, `IPTab50406.ICRMovementLine`, `IPPag50410.ICRMovementAPI`, `IPPag50411.ICRMovementLineAPI`, `IPCod50417.ICRMovementProcessing`, `IPCod50418.ICRMovementPosting`, `IPCod50419.ICRMovementValidation`, `IPCod50420.RawMaterialReceipt`, `IPCod50424.ICRMovementJobQueue`, `IPEnum50408.ICRMovementType`, `IPEnum50409.MovementSourceDocType` |
+| 6.4 Inbound Raw Material Receipt Processing | `IPTab50405.ICRInboundEntryHeader`, `IPTab50406.ICRInboundEntryLines`, `IPPag50410.ICRInboundEntryAPI`, `IPPag50411.ICRInboundEntryLineAPI`, `IPCod50417.ICRMovementProcessing`, `IPCod50418.ICRMovementPosting`, `IPCod50419.ICRMovementValidation`, `IPCod50420.RawMaterialReceipt`, `IPCod50424.ICRMovementJobQueue`, `IPEnum50408.ICRMovementType`, `IPEnum50409.MovementSourceDocType` |
 | 6.5 Finished Goods Shipment Processing | `IPCod50421.FGShipmentProcessing`, `IPCod50422.TransferPhantomLotMgt`, `IPTabExt50405–50408` (Transfer Header/Line, Transfer Shipment Header/Line), `IPPagExt50403.TransferOrder`, `IPPagExt50404.PostedTransferShipment`, setup fields *FG 3PL Location Code*, *FG In-Transit Code* |
-| 3.5 Operational Visibility | `IPCod50423.ICRMovementLogMgt`, `IPPag50412.ICRMovements`, `IPPag50413.ICRMovement`, `IPPag50414.ICRMovementSubform`, Activity Log field *ICR Movement Entry No.* |
+| 3.5 Operational Visibility | `IPCod50423.ICRMovementLogMgt`, `IPPag50412.ICRInboundEntries`, `IPPag50413.ICRInboundEntry`, `IPPag50414.ICRInboundEntrySubform`, Activity Log field *ICR Inbound Entry No.* |
 
 ## Design decisions to confirm
+
+- **One inbound table for both FDDs**: `IP ICR Inbound Entry Header` / `IP ICR Inbound Entry Lines` receive every ICR movement (030, 087, 100, 101, 122, 311). On insert, a 030 / 087 for a production PO gets its *Assembly Order No.*. Inventory Orchestration processes only 030 without Assembly Order and 311; everything else is left for the ICR-MRP inbound process.
 
 - **One app**: added to the existing extension so PO/TO payloads are not sent twice and the Activity Log stays in one place.
 - **TO trigger**: setup *TO Outbound Trigger* = Shipment (default, per this FDD) or Release (earlier ICR-MRP behavior).
@@ -120,4 +122,4 @@ Comments use `/// Comment - Functional Design Document for ICR - Inventory Orche
 
 1. Filler Integration Setup: *TO Outbound Trigger*, *FG 3PL Location Code*, *FG In-Transit Code* (or a transfer route).
 2. Schedule a Job Queue Entry for codeunit **50424 IP ICR Movement Job Queue**.
-3. Point the middleware at `/api/interparfums/fillerIntegration/v1.0/companies({id})/icrMovements` (deep insert with `posd`).
+3. Point the middleware at `/api/interparfums/fillerIntegration/v1.0/companies({id})/icrInboundEntries` (deep insert with `posd`).

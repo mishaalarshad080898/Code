@@ -2,20 +2,20 @@
 /// API endpoint where the middleware posts inbound ICR "Movement" payloads (header plus posd lines
 /// in one deep insert). Field names follow the ICR JSON (PO_NUMBER, HDTEXT, MVT_TYPE ...). Inserted
 /// movements are logged and then processed by the job queue or manually.
-/// Endpoint: /api/interparfums/fillerIntegration/v1.0/companies({id})/icrMovements
+/// Endpoint: /api/interparfums/fillerIntegration/v1.0/companies({id})/icrInboundEntries
 /// </summary>
 /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing (Receives payload) / 6.5 Finished Goods Shipment Processing (Inbound payload received)
-page 50410 "IP ICR Movement API"
+page 50410 "IP ICR Inbound Entry API"
 {
     PageType = API;
     APIPublisher = 'interparfums';
     APIGroup = 'fillerIntegration';
     APIVersion = 'v1.0';
-    EntityName = 'icrMovement';
-    EntitySetName = 'icrMovements';
-    EntityCaption = 'ICR Movement';
-    EntitySetCaption = 'ICR Movements';
-    SourceTable = "IP ICR Movement Header";
+    EntityName = 'icrInboundEntry';
+    EntitySetName = 'icrInboundEntries';
+    EntityCaption = 'ICR Inbound Entry';
+    EntitySetCaption = 'ICR Inbound Entries';
+    SourceTable = "IP ICR Inbound Entry Header";
     ODataKeyFields = SystemId;
     DelayedInsert = true;
     Extensible = false;
@@ -45,11 +45,11 @@ page 50410 "IP ICR Movement API"
                 {
                     Caption = 'PO_NUMBER';
                 }
-                field(hdText; Rec."ICR Document No.")
+                field(hdText; Rec."HD Text")
                 {
                     Caption = 'HDTEXT';
                 }
-                field(dNumber; Rec."BOL No.")
+                field(dNumber; Rec."D Number")
                 {
                     Caption = 'D_NUMBER';
                 }
@@ -61,11 +61,11 @@ page 50410 "IP ICR Movement API"
                 {
                     Caption = 'PSTNG_DATE';
                 }
-                field(mvtType; Rec."Movement Type Code")
+                field(mvtType; Rec."Mvt Type")
                 {
                     Caption = 'MVT_TYPE';
                 }
-                field(specStock; Rec."Special Stock")
+                field(specStock; Rec."Spec Stock")
                 {
                     Caption = 'SPEC_STOCK';
                 }
@@ -93,12 +93,12 @@ page 50410 "IP ICR Movement API"
                     Caption = 'Error Message';
                     Editable = false;
                 }
-                part(posd; "IP ICR Movement Line API")
+                part(posd; "IP ICR Inbound Entry Line API")
                 {
                     Caption = 'posd';
-                    EntityName = 'icrMovementLine';
-                    EntitySetName = 'icrMovementLines';
-                    SubPageLink = "Entry No." = field("Entry No.");
+                    EntityName = 'icrInboundEntryLine';
+                    EntitySetName = 'icrInboundEntryLines';
+                    SubPageLink = "Inbound Header Entry No." = field("Entry No.");
                 }
             }
         }

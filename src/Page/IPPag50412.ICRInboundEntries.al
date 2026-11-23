@@ -1,17 +1,18 @@
 /// <summary>
-/// List of inbound ICR movements (goods receipts and finished goods shipments) with their status,
-/// the BC document they were posted against and the error, if any. Movements can be processed or
+/// List of all inbound ICR entries of both FDDs (production PO completions, scrap, adjustments, raw
+/// material receipts and finished goods shipments) with their status, the BC document they were
+/// posted against and the error, if any. Inventory Orchestration entries can be processed or
 /// retried from here.
 /// </summary>
 /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.5 Operational Visibility / 5.2 Integration Assumptions (1) retry processing
-page 50412 "IP ICR Movements"
+page 50412 "IP ICR Inbound Entries"
 {
-    Caption = 'ICR Movements';
+    Caption = 'ICR Inbound Entries';
     PageType = List;
     ApplicationArea = All;
     UsageCategory = Lists;
-    SourceTable = "IP ICR Movement Header";
-    CardPageId = "IP ICR Movement";
+    SourceTable = "IP ICR Inbound Entry Header";
+    CardPageId = "IP ICR Inbound Entry";
     Editable = false;
     SourceTableView = sorting("Entry No.") order(descending);
 
@@ -42,17 +43,33 @@ page 50412 "IP ICR Movements"
                 {
                     ToolTip = 'Specifies the BC order number sent by ICR (PO_NUMBER).';
                 }
-                field("ICR Document No."; Rec."ICR Document No.")
+                field("HD Text"; Rec."HD Text")
                 {
                     ToolTip = 'Specifies the document number in the ICR system (HDTEXT).';
                 }
-                field("BOL No."; Rec."BOL No.")
+                field("D Number"; Rec."D Number")
                 {
                     ToolTip = 'Specifies the bill of lading (D_NUMBER).';
                 }
                 field("Vendor No."; Rec."Vendor No.")
                 {
                     ToolTip = 'Specifies the integrated filler.';
+                }
+                field("Assembly Order No."; Rec."Assembly Order No.")
+                {
+                    ToolTip = 'Specifies the Assembly Order of the production PO (ICR-MRP entries only).';
+                }
+                field("Receipt Posted"; Rec."Receipt Posted")
+                {
+                    ToolTip = 'Specifies whether the receipt step was posted.';
+                }
+                field("Output Posted"; Rec."Output Posted")
+                {
+                    ToolTip = 'Specifies whether the assembly output step was posted (ICR-MRP entries only).';
+                }
+                field("Scrap Posted"; Rec."Scrap Posted")
+                {
+                    ToolTip = 'Specifies whether the scrap step was posted (ICR-MRP entries only).';
                 }
                 field("Source Document Type"; Rec."Source Document Type")
                 {
@@ -90,7 +107,7 @@ page 50412 "IP ICR Movements"
             {
                 Caption = 'Process';
                 Image = Start;
-                ToolTip = 'Process the selected movement now.';
+                ToolTip = 'Process the selected Inventory Orchestration entry (030 raw material receipt or 311 finished goods shipment) now.';
 
                 trigger OnAction()
                 var
@@ -118,7 +135,7 @@ page 50412 "IP ICR Movements"
             {
                 Caption = 'Process All Received';
                 Image = ExecuteBatch;
-                ToolTip = 'Process all movements in status Received.';
+                ToolTip = 'Process all Inventory Orchestration entries in status Received.';
 
                 trigger OnAction()
                 var
@@ -136,7 +153,7 @@ page 50412 "IP ICR Movements"
                 Caption = 'Filler Integration Activity Log';
                 Image = Log;
                 RunObject = page "IP Filler Integration Log";
-                RunPageLink = "ICR Movement Entry No." = field("Entry No.");
+                RunPageLink = "ICR Inbound Entry No." = field("Entry No.");
                 ToolTip = 'Open the Activity Log entries of this movement.';
             }
         }

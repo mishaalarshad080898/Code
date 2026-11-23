@@ -120,10 +120,10 @@ table 50101 "IP Filler Integration Log"
         {
             Caption = 'Document No.';
         }
-        field(26; "ICR Movement Entry No."; Integer)
+        field(26; "ICR Inbound Entry No."; Integer)
         {
-            Caption = 'ICR Movement Entry No.';
-            TableRelation = "IP ICR Movement Header";
+            Caption = 'ICR Inbound Entry No.';
+            TableRelation = "IP ICR Inbound Entry Header";
         }
     }
 
@@ -145,7 +145,7 @@ table 50101 "IP Filler Integration Log"
         key(DocumentKey; "Document No.", "Document Type")
         {
         }
-        key(MovementKey; "ICR Movement Entry No.")
+        key(MovementKey; "ICR Inbound Entry No.")
         {
         }
     }

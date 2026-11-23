@@ -1,19 +1,20 @@
 /// <summary>
-/// API part for the posd lines of an inbound ICR movement (used in the deep insert).
+/// API part for the posd lines of an inbound ICR entry (used in the deep insert).
 /// Field names follow the ICR JSON (PO_ITEM, MATNR, MENGE, MEINS ...).
 /// </summary>
+/// Comment - Functional Design Document for ICR-MRP integration v3 - 5.15 Inbound Payload Processing
 /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing / 6.5 Finished Goods Shipment Processing
-page 50411 "IP ICR Movement Line API"
+page 50411 "IP ICR Inbound Entry Line API"
 {
     PageType = API;
     APIPublisher = 'interparfums';
     APIGroup = 'fillerIntegration';
     APIVersion = 'v1.0';
-    EntityName = 'icrMovementLine';
-    EntitySetName = 'icrMovementLines';
-    EntityCaption = 'ICR Movement Line';
-    EntitySetCaption = 'ICR Movement Lines';
-    SourceTable = "IP ICR Movement Line";
+    EntityName = 'icrInboundEntryLine';
+    EntitySetName = 'icrInboundEntryLines';
+    EntityCaption = 'ICR Inbound Entry Line';
+    EntitySetCaption = 'ICR Inbound Entry Lines';
+    SourceTable = "IP ICR Inbound Entry Lines";
     ODataKeyFields = SystemId;
     DelayedInsert = true;
     Extensible = false;
@@ -32,12 +33,13 @@ page 50411 "IP ICR Movement Line API"
                 field(entryNo; Rec."Entry No.")
                 {
                     Caption = 'Entry No.';
+                    Editable = false;
                 }
-                field(lineNo; Rec."Line No.")
+                field(inboundHeaderEntryNo; Rec."Inbound Header Entry No.")
                 {
-                    Caption = 'Line No.';
+                    Caption = 'Inbound Header Entry No.';
                 }
-                field(poItem; Rec."PO Item")
+                field(poItem; Rec."Item Line No")
                 {
                     Caption = 'PO_ITEM';
                 }
@@ -45,31 +47,31 @@ page 50411 "IP ICR Movement Line API"
                 {
                     Caption = 'MATNR';
                 }
-                field(werks; Rec.Plant)
+                field(werks; Rec.WERKS)
                 {
                     Caption = 'WERKS';
                 }
-                field(itText; Rec."Item Text")
+                field(itText; Rec.ITTEXT)
                 {
                     Caption = 'ITTEXT';
                 }
-                field(lgort; Rec."Storage Location")
+                field(lgort; Rec."Location Code")
                 {
                     Caption = 'LGORT';
                 }
-                field(menge; Rec.Quantity)
+                field(menge; Rec.Qty)
                 {
                     Caption = 'MENGE';
                 }
-                field(meins; Rec."Unit of Measure Code")
+                field(meins; Rec."Unit of Measure")
                 {
                     Caption = 'MEINS';
                 }
-                field(final; Rec."Final")
+                field(final; Rec.FINAL)
                 {
                     Caption = 'FINAL';
                 }
-                field(itemOk; Rec."Item OK")
+                field(itemOk; Rec.ITEM_OK)
                 {
                     Caption = 'ITEM_OK';
                 }
@@ -81,11 +83,11 @@ page 50411 "IP ICR Movement Line API"
                 {
                     Caption = 'LBLKZ';
                 }
-                field(netpr; Rec."Net Price")
+                field(netpr; Rec.NETPR)
                 {
                     Caption = 'NETPR';
                 }
-                field(peinh; Rec."Price Unit")
+                field(peinh; Rec.PEINH)
                 {
                     Caption = 'PEINH';
                 }

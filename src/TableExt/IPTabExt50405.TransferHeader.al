@@ -7,11 +7,11 @@ tableextension 50405 "IP Transfer Header" extends "Transfer Header"
 {
     fields
     {
-        field(50405; "IP ICR Movement Entry No."; Integer)
+        field(50405; "IP ICR Inbound Entry No."; Integer)
         {
-            Caption = 'ICR Movement Entry No.';
+            Caption = 'ICR Inbound Entry No.';
             DataClassification = CustomerContent;
-            TableRelation = "IP ICR Movement Header";
+            TableRelation = "IP ICR Inbound Entry Header";
             Editable = false;
         }
         field(50406; "IP Created by ICR Movement"; Boolean)
