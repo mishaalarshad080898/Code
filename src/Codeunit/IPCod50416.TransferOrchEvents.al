@@ -38,7 +38,7 @@ codeunit 50416 "IP Transfer Orch. Events"
         if FillerSetup."TO Outbound Trigger" <> FillerSetup."TO Outbound Trigger"::Shipment then
             exit;
 
-        if not OrchValidation.ValidateTransferShipment(TransferHeader, FillerSetup, ErrorText) then begin
+        if not OrchValidation.ValidateTransferShipment(TransferHeader, TransferShipmentHeader, FillerSetup, ErrorText) then begin
             MovementLogMgt.LogDocument("IP Integration Direction"::Outbound, "IP Integration Event Type"::"Outbound Validation", "IP Integration Status"::Exception,
                 FillerSetup."Vendor No.", "IP Integration Doc. Type"::"Transfer Order", TransferHeader."No.",
                 StrSubstNo(ValidationFailedTxt, TransferShipmentHeader."No.", TransferHeader."No."), ErrorText);

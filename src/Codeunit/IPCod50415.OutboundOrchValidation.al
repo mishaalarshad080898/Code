@@ -64,34 +64,31 @@ codeunit 50415 "IP Outbound Orch. Validation"
     end;
 
     /// <summary>
-    /// TO shipment validation: the Transfer-to Code is an integrated filler, the filler
-    /// configuration is complete, the shipment was posted (shipped quantity exists) and the
-    /// required line information is present.
+    /// TO shipment validation, run after the Transfer Shipment is posted. It checks the posted
+    /// shipment itself (Transfer Shipment Lines), not the Transfer Order lines: after posting, BC has
+    /// already reset Qty. to Ship on the order, and lines not shipped this time must not be checked.
+    /// Checks: filler configuration is complete, the shipment has at least one item line with a
+    /// quantity, and every shipped line has a unit of measure.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.2 Transfer Order Shipment to Integrated Filler (Validations and Exception Handling)
-    procedure ValidateTransferShipment(TransferHeader: Record "Transfer Header"; FillerSetup: Record "IP Filler Integration Setup"; var ErrorText: Text): Boolean
+    procedure ValidateTransferShipment(TransferHeader: Record "Transfer Header"; TransferShipmentHeader: Record "Transfer Shipment Header"; FillerSetup: Record "IP Filler Integration Setup"; var ErrorText: Text): Boolean
     var
-        TransferLine: Record "Transfer Line";
+        TransferShipmentLine: Record "Transfer Shipment Line";
     begin
         ErrorText := '';
         if not CheckFillerConfiguration(FillerSetup, ErrorText) then
             exit(false);
 
-        TransferLine.SetRange("Document No.", TransferHeader."No.");
-        TransferLine.SetRange("Derived From Line No.", 0);
-        TransferLine.SetFilter("Item No.", '<>%1', '');
-        if not TransferLine.FindSet() then
-            exit(SetError(ErrorText, StrSubstNo(NoFillerLinesErr, TransferOrderTxt, TransferHeader."No.", FillerSetup."Filler Location Code")));
-        repeat
-            if TransferLine.Quantity <= 0 then
-                exit(SetError(ErrorText, StrSubstNo(LineQtyErr, TransferLine."Line No.", TransferOrderTxt, TransferHeader."No.")));
-            if TransferLine."Unit of Measure Code" = '' then
-                exit(SetError(ErrorText, StrSubstNo(LineFieldMissingErr, TransferLine.FieldCaption("Unit of Measure Code"), TransferLine."Line No.", TransferOrderTxt, TransferHeader."No.")));
-        until TransferLine.Next() = 0;
-
-        TransferLine.SetFilter("Quantity Shipped", '>0');
-        if TransferLine.IsEmpty() then
+        // Only the lines of this posted shipment, with an item and a shipped quantity.
+        TransferShipmentLine.SetRange("Document No.", TransferShipmentHeader."No.");
+        TransferShipmentLine.SetFilter("Item No.", '<>%1', '');
+        TransferShipmentLine.SetFilter(Quantity, '>0');
+        if not TransferShipmentLine.FindSet() then
             exit(SetError(ErrorText, StrSubstNo(NotShippedErr, TransferHeader."No.", FillerSetup."Filler Location Code")));
+        repeat
+            if TransferShipmentLine."Unit of Measure Code" = '' then
+                exit(SetError(ErrorText, StrSubstNo(LineFieldMissingErr, TransferShipmentLine.FieldCaption("Unit of Measure Code"), TransferShipmentLine."Line No.", TransferOrderTxt, TransferHeader."No.")));
+        until TransferShipmentLine.Next() = 0;
         exit(true);
     end;
 
