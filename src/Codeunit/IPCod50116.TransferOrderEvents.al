@@ -66,7 +66,31 @@ codeunit 50116 "IP Transfer Order Events"
     begin
         if Rec.IsTemporary() or (not RunTrigger) then
             exit;
+        // BC refuses to delete a TO with items still in transit. Do not tell the filler it is deleted
+        // when BC will stop the deletion right after this subscriber.
+        if HasQtyInTransit(Rec) then
+            exit;
         if not ICROrderMessage.SendTransferOrderDeletion(Rec) then
             Error(DeleteNotSentErr, Rec."No.", ICROrderMessage.GetLastFailureText());
+    end;
+
+    /// <summary>
+    /// True when a line of the TO was shipped but not yet received (items in transit). BC does not
+    /// allow such a TO to be deleted, so no Delete message may be sent for it.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR-MRP integration v3 - Interface 3.1 PO/TO/ProdPO (Delete)
+    /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.2 Transfer Order Shipment to Integrated Filler (inventory in transit)
+    local procedure HasQtyInTransit(TransferHeader: Record "Transfer Header"): Boolean
+    var
+        TransferLine: Record "Transfer Line";
+    begin
+        TransferLine.SetRange("Document No.", TransferHeader."No.");
+        TransferLine.SetRange("Derived From Line No.", 0);
+        if TransferLine.FindSet() then
+            repeat
+                if TransferLine."Quantity Shipped" <> TransferLine."Quantity Received" then
+                    exit(true);
+            until TransferLine.Next() = 0;
+        exit(false);
     end;
 }
