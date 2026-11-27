@@ -102,11 +102,12 @@ Comments use `/// Comment - Functional Design Document for ICR - Inventory Orche
 | 6.3 Outbound Integration Trigger Points | `IPCod50415`, `IPCod50416`, existing `IPCod50115.ICROrderMessage` (payload, duplicate prevention) |
 | 6.4 Inbound Raw Material Receipt Processing | `IPTab50405.ICRInboundEntryHeader`, `IPTab50406.ICRInboundEntryLines`, `IPPag50410.ICRInboundEntryAPI`, `IPPag50411.ICRInboundEntryLineAPI`, `IPCod50417.ICRMovementProcessing`, `IPCod50418.ICRMovementPosting`, `IPCod50419.ICRMovementValidation`, `IPCod50420.RawMaterialReceipt`, `IPCod50424.ICRMovementJobQueue`, `IPEnum50408.ICRMovementType`, `IPEnum50409.MovementSourceDocType` |
 | 6.5 Finished Goods Shipment Processing | `IPCod50421.FGShipmentProcessing`, `IPCod50422.TransferPhantomLotMgt`, `IPTabExt50405–50408` (Transfer Header/Line, Transfer Shipment Header/Line), `IPPagExt50403.TransferOrder`, `IPPagExt50404.PostedTransferShipment`, setup fields *FG 3PL Location Code*, *FG In-Transit Code* |
+| Positive & negative adjustments (100 / 101) | `IPCod50425.ICRAdjustmentPosting`, `IPCod50419.ICRMovementValidation` (setup + LGORT checks), setup fields *Adj. Jnl. Template Name*, *Adj. Jnl. Batch Name*, *Auto Post Adjustments* |
 | 3.5 Operational Visibility | `IPCod50423.ICRMovementLogMgt`, `IPPag50412.ICRInboundEntries`, `IPPag50413.ICRInboundEntry`, `IPPag50414.ICRInboundEntrySubform`, Activity Log field *ICR Inbound Entry No.* |
 
 ## Design decisions to confirm
 
-- **One inbound table for both FDDs**: `IP ICR Inbound Entry Header` / `IP ICR Inbound Entry Lines` receive every ICR movement (030, 087, 100, 101, 122, 311). On insert, a 030 / 087 for a production PO gets its *Assembly Order No.*. Inventory Orchestration processes only 030 without Assembly Order and 311; everything else is left for the ICR-MRP inbound process.
+- **One inbound table for both FDDs**: `IP ICR Inbound Entry Header` / `IP ICR Inbound Entry Lines` receive every ICR movement (030, 087, 100, 101, 122, 311). On insert, a 030 / 087 for a production PO gets its *Assembly Order No.*. Inventory Orchestration processes 030 without Assembly Order, 311, 100 and 101; everything else is left for the ICR-MRP inbound process.
 
 - **One app**: added to the existing extension so PO/TO payloads are not sent twice and the Activity Log stays in one place.
 - **TO trigger**: setup *TO Outbound Trigger* = Shipment (default, per this FDD) or Release (earlier ICR-MRP behavior).
@@ -116,10 +117,11 @@ Comments use `/// Comment - Functional Design Document for ICR - Inventory Orche
 - **Duplicates**: same Message ID, or same `MVT_TYPE` + `PO_NUMBER` + `HDTEXT`, already processed.
 - **No double posting**: the movement is set to Processed in the same transaction as the BC posting.
 - **Physical lot**: optional line field `physicalLotNo`. Used for lot-tracked raw materials; ignored (audit only) for phantom-lot finished goods. A payload lot of `XXXX` while Phantom Lot is off is an error.
-- **Out of scope here**: movements 087, 100, 101, 122 are stored and rejected as not in scope. Warehouse receive/ship documents and bins are not handled.
+- **Adjustments (100 / 101)**: one Item Journal line per `posd` line (Positive / Negative Adjmt.) in the adjustment batch from setup, location = `LGORT`, no reason code. Lot-tracked items always get the phantom lot (XXXX); other items no lot. Positive adjustments use `NETPR / PEINH` as unit cost; negative adjustments take the cost of the inventory removed.
+- **Out of scope here**: movements 087 and 122 are stored and rejected as not in scope. Warehouse receive/ship documents and bins are not handled.
 
 ## Setup checklist (Inventory Orchestration)
 
-1. Filler Integration Setup: *TO Outbound Trigger*, *FG 3PL Location Code*, *FG In-Transit Code* (or a transfer route).
+1. Filler Integration Setup: *TO Outbound Trigger*, *FG 3PL Location Code*, *FG In-Transit Code* (or a transfer route), *Adj. Jnl. Template Name*, *Adj. Jnl. Batch Name*, *Auto Post Adjustments*.
 2. Schedule a Job Queue Entry for codeunit **50424 IP ICR Movement Job Queue**.
 3. Point the middleware at `/api/interparfums/fillerIntegration/v1.0/companies({id})/icrInboundEntries` (deep insert with `posd`).

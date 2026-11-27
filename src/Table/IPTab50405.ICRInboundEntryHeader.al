@@ -241,8 +241,8 @@ table 50405 "IP ICR Inbound Entry Header"
 
     /// <summary>
     /// True when the entry belongs to Inventory Orchestration: a raw material receipt (030 not linked
-    /// to an Assembly Order) or a finished goods transfer to the 3PL (311). All other entries are
-    /// processed by the ICR-MRP inbound process.
+    /// to an Assembly Order), a finished goods transfer to the 3PL (311) or a positive / negative
+    /// adjustment (100 / 101). All other entries are processed by the ICR-MRP inbound process.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 / 6.5 (one inbound table for both FDDs)
     procedure IsInventoryOrchestration(): Boolean
@@ -250,7 +250,7 @@ table 50405 "IP ICR Inbound Entry Header"
         case Rec."Mvt Type" of
             '030':
                 exit(Rec."Assembly Order No." = '');
-            '311':
+            '311', '100', '101':
                 exit(true);
         end;
         exit(false);

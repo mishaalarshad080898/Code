@@ -59,5 +59,6 @@ permissionset 50100 "IP FILLER INTEG"
         codeunit "IP FG Shipment Processing" = X,
         codeunit "IP Transfer Phantom Lot Mgt" = X,
         codeunit "IP ICR Movement Log Mgt" = X,
-        codeunit "IP ICR Movement Job Queue" = X;
+        codeunit "IP ICR Movement Job Queue" = X,
+        codeunit "IP ICR Adjustment Posting" = X;
 }

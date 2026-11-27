@@ -20,7 +20,7 @@ codeunit 50417 "IP ICR Movement Processing"
         ProcessedMsg: Label 'ICR movement %1 was processed.', Comment = '%1 = Entry No.';
         FailedMsg: Label 'ICR movement %1 could not be processed:\\%2', Comment = '%1 = Entry No., %2 = Error';
         DuplicateMsg: Label 'ICR movement %1 is a duplicate and was not processed.', Comment = '%1 = Entry No.';
-        NotOrchestrationErr: Label 'ICR inbound entry %1 (MVT_TYPE %2) is not an Inventory Orchestration entry. It is processed by the ICR-MRP inbound process (production PO completion, scrap or adjustment).', Comment = '%1 = Entry No., %2 = Movement type';
+        NotOrchestrationErr: Label 'ICR inbound entry %1 (MVT_TYPE %2) is not an Inventory Orchestration entry. It is processed by the ICR-MRP inbound process (production PO completion or scrap).', Comment = '%1 = Entry No., %2 = Movement type';
 
     /// <summary>
     /// Processes one movement. Duplicates are set to Duplicate. Otherwise the movement runs in its
@@ -32,8 +32,8 @@ codeunit 50417 "IP ICR Movement Processing"
     var
         Success: Boolean;
     begin
-        // One inbound table serves both FDDs: only raw material receipts (030 without Assembly Order)
-        // and finished goods transfers (311) are processed here.
+        // One inbound table serves both FDDs: only raw material receipts (030 without Assembly Order),
+        // finished goods transfers (311) and adjustments (100 / 101) are processed here.
         if not MovementHeader.IsInventoryOrchestration() then
             Error(NotOrchestrationErr, MovementHeader."Entry No.", MovementHeader."Mvt Type");
         if MovementHeader.Status = MovementHeader.Status::Processed then
@@ -103,7 +103,7 @@ codeunit 50417 "IP ICR Movement Processing"
     end;
 
     /// <summary>
-    /// Processes all Inventory Orchestration entries (030 without Assembly Order, 311) in status
+    /// Processes all Inventory Orchestration entries (030 without Assembly Order, 311, 100, 101) in status
     /// Received, oldest first. Entries of the ICR-MRP process are left alone. Used by the job queue.
     /// </summary>
     /// Comment - Functional Design Document for ICR - Inventory Orchestration - 3.2 Core Behavior (Validated inbound payloads initiate Business Central transaction processing)
@@ -115,7 +115,7 @@ codeunit 50417 "IP ICR Movement Processing"
     begin
         MovementHeader.SetCurrentKey(Status, "Mvt Type");
         MovementHeader.SetRange(Status, MovementHeader.Status::Received);
-        MovementHeader.SetFilter("Mvt Type", '%1|%2', '030', '311');
+        MovementHeader.SetFilter("Mvt Type", '%1|%2|%3|%4', '030', '311', '100', '101');
         if MovementHeader.FindSet() then
             repeat
                 if MovementHeader.IsInventoryOrchestration() then

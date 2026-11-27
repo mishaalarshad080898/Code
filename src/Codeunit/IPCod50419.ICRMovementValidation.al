@@ -12,7 +12,9 @@ codeunit 50419 "IP ICR Movement Validation"
         UOMMgt: Codeunit "Unit of Measure Management";
         NoLinesErr: Label 'ICR movement %1 has no lines.', Comment = '%1 = Entry No.';
         UnknownMovementTypeErr: Label 'ICR movement %1 has movement type %2, which is not a known ICR movement type.', Comment = '%1 = Entry No., %2 = MVT_TYPE';
-        NotInScopeErr: Label 'ICR movement type %1 is not processed by Inventory Orchestration. Only 030 (Goods Receipt) and 311 (Transfer to 3PL) are in scope.', Comment = '%1 = Movement type';
+        NotInScopeErr: Label 'ICR movement type %1 is not processed by Inventory Orchestration. Only 030 (Goods Receipt), 311 (Transfer to 3PL), 100 (Positive Adjustment) and 101 (Negative Adjustment) are in scope.', Comment = '%1 = Movement type';
+        LocationMissingErr: Label 'Location %1 (LGORT) on line %2 of ICR movement %3 does not exist in BC.', Comment = '%1 = Location Code, %2 = Line No., %3 = Entry No.';
+        LocationInTransitErr: Label 'Location %1 (LGORT) on line %2 of ICR movement %3 is an in-transit location and cannot be adjusted.', Comment = '%1 = Location Code, %2 = Line No., %3 = Entry No.';
         PONumberMissingErr: Label 'ICR movement %1 (Goods Receipt) has no order number (PO_NUMBER).', Comment = '%1 = Entry No.';
         DocumentNotFoundErr: Label 'Order %1 of ICR movement %2 does not exist as a Purchase Order or Transfer Order.', Comment = '%1 = PO_NUMBER, %2 = Entry No.';
         ProductionPOErr: Label 'Purchase Order %1 is a production PO linked to Assembly Order %2. Its goods receipt is processed by the ICR-MRP filler completion process, not by Inventory Orchestration.', Comment = '%1 = PO No., %2 = AO No.';
@@ -73,7 +75,8 @@ codeunit 50419 "IP ICR Movement Validation"
     begin
         if MovementHeader."Movement Type" = MovementHeader."Movement Type"::" " then
             Error(UnknownMovementTypeErr, MovementHeader."Entry No.", MovementHeader."Mvt Type");
-        if not (MovementHeader."Movement Type" in [MovementHeader."Movement Type"::"Goods Receipt", MovementHeader."Movement Type"::"Transfer to 3PL"]) then
+        if not (MovementHeader."Movement Type" in [MovementHeader."Movement Type"::"Goods Receipt", MovementHeader."Movement Type"::"Transfer to 3PL",
+                                                   MovementHeader."Movement Type"::"Positive Adjustment", MovementHeader."Movement Type"::"Negative Adjustment"]) then
             Error(NotInScopeErr, MovementHeader."Movement Type");
         if (MovementHeader."Movement Type" = MovementHeader."Movement Type"::"Goods Receipt") and (MovementHeader."PO Number" = '') then
             Error(PONumberMissingErr, MovementHeader."Entry No.");
@@ -232,6 +235,72 @@ codeunit 50419 "IP ICR Movement Validation"
             Error(SetupFieldMissingErr, FillerSetup.FieldCaption("FG 3PL Location Code"), FillerSetup."Vendor No.");
         Location.Get(FillerSetup."FG 3PL Location Code");
         Location.TestField("Use As In-Transit", false);
+    end;
+
+    /// <summary>
+    /// Adjustments (100 / 101): determines the filler setup that holds the adjustment journal. Uses
+    /// the filler vendor on the entry, else the vendor (LIFNR) on a line, else the filler whose
+    /// location is the LGORT of the first line, else the only enabled filler. The adjustment journal
+    /// template and batch must be set up.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR - Inventory Orchestration - Positive & negative adjustments (Journal: parametrized in Filler Integration Setup)
+    procedure ResolveAdjustmentSetup(var MovementHeader: Record "IP ICR Inbound Entry Header"; var FillerSetup: Record "IP Filler Integration Setup")
+    var
+        MovementLine: Record "IP ICR Inbound Entry Lines";
+    begin
+        if MovementHeader."Vendor No." = '' then begin
+            MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
+            MovementLine.SetFilter("Vendor No.", '<>%1', '');
+            if MovementLine.FindFirst() then
+                MovementHeader."Vendor No." := MovementLine."Vendor No.";
+        end;
+        if MovementHeader."Vendor No." = '' then begin
+            MovementLine.Reset();
+            MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
+            if MovementLine.FindFirst() then
+                if FillerSetup.GetEnabledByLocation(MovementLine."Location Code") then
+                    MovementHeader."Vendor No." := FillerSetup."Vendor No.";
+        end;
+        if MovementHeader."Vendor No." = '' then begin
+            FillerSetup.Reset();
+            FillerSetup.SetRange("Integration Enabled", true);
+            if FillerSetup.Count() <> 1 then
+                Error(NoFillerSetupErr, MovementHeader."Entry No.");
+            FillerSetup.FindFirst();
+            MovementHeader."Vendor No." := FillerSetup."Vendor No.";
+        end;
+
+        if not FillerSetup.Get(MovementHeader."Vendor No.") then
+            Error(FillerNotEnabledErr, MovementHeader."Vendor No.");
+        if not FillerSetup."Integration Enabled" then
+            Error(FillerNotEnabledErr, MovementHeader."Vendor No.");
+        if FillerSetup."Adj. Jnl. Template Name" = '' then
+            Error(SetupFieldMissingErr, FillerSetup.FieldCaption("Adj. Jnl. Template Name"), FillerSetup."Vendor No.");
+        if FillerSetup."Adj. Jnl. Batch Name" = '' then
+            Error(SetupFieldMissingErr, FillerSetup.FieldCaption("Adj. Jnl. Batch Name"), FillerSetup."Vendor No.");
+        MovementHeader.Modify();
+    end;
+
+    /// <summary>
+    /// Adjustment line checks: every line has an LGORT that is an existing, non in-transit BC location.
+    /// Item, quantity and unit of measure are already checked by ValidateHeaderAndLines.
+    /// </summary>
+    /// Comment - Functional Design Document for ICR - Inventory Orchestration - Positive & negative adjustments (Location: use LGORT)
+    procedure ValidateAdjustmentLines(MovementHeader: Record "IP ICR Inbound Entry Header")
+    var
+        MovementLine: Record "IP ICR Inbound Entry Lines";
+        Location: Record Location;
+    begin
+        MovementLine.SetRange("Inbound Header Entry No.", MovementHeader."Entry No.");
+        MovementLine.FindSet();
+        repeat
+            if MovementLine."Location Code" = '' then
+                Error(LineFieldMissingErr, MovementLine.FieldCaption("Location Code"), MovementLine."Entry No.", MovementHeader."Entry No.");
+            if not Location.Get(MovementLine."Location Code") then
+                Error(LocationMissingErr, MovementLine."Location Code", MovementLine."Entry No.", MovementHeader."Entry No.");
+            if Location."Use As In-Transit" then
+                Error(LocationInTransitErr, MovementLine."Location Code", MovementLine."Entry No.", MovementHeader."Entry No.");
+        until MovementLine.Next() = 0;
     end;
 
     /// <summary>

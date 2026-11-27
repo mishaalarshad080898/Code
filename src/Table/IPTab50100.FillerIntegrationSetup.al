@@ -122,6 +122,22 @@ table 50100 "IP Filler Integration Setup"
             Caption = 'Finished Goods In-Transit Code';
             TableRelation = Location where("Use As In-Transit" = const(true));
         }
+        // Fields 22-24: ICR positive / negative adjustments (MVT_TYPE 100 / 101).
+        field(22; "Adj. Jnl. Template Name"; Code[10])
+        {
+            Caption = 'Adjustment Journal Template Name';
+            TableRelation = "Item Journal Template" where(Type = const(Item));
+        }
+        field(23; "Adj. Jnl. Batch Name"; Code[10])
+        {
+            Caption = 'Adjustment Journal Batch Name';
+            TableRelation = "Item Journal Batch".Name where("Journal Template Name" = field("Adj. Jnl. Template Name"));
+        }
+        field(24; "Auto Post Adjustments"; Boolean)
+        {
+            Caption = 'Auto Post Adjustments';
+            InitValue = true;
+        }
     }
 
     keys

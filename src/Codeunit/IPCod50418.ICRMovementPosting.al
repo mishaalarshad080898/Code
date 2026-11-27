@@ -1,10 +1,11 @@
 /// <summary>
 /// Runs one inbound ICR movement as a single unit of work: validate, then route by movement type.
 /// 030 Goods Receipt posts the Purchase Order or inbound Transfer Order receipt; 311 Transfer to
-/// 3PL finds or creates the finished goods Transfer Order and posts the shipment. It is started
+/// 3PL finds or creates the finished goods Transfer Order and posts the shipment; 100 / 101 post a
+/// positive / negative adjustment through the Item Journal. It is started
 /// with Codeunit.Run, so any error rolls back the whole movement and nothing is posted.
 /// </summary>
-/// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing / 6.5 Finished Goods Shipment Processing
+/// Comment - Functional Design Document for ICR - Inventory Orchestration - 6.4 Inbound Raw Material Receipt Processing / 6.5 Finished Goods Shipment Processing / Positive & negative adjustments
 codeunit 50418 "IP ICR Movement Posting"
 {
     TableNo = "IP ICR Inbound Entry Header";
@@ -13,6 +14,7 @@ codeunit 50418 "IP ICR Movement Posting"
         Validation: Codeunit "IP ICR Movement Validation";
         RawMaterialReceipt: Codeunit "IP Raw Material Receipt";
         FGShipmentProcessing: Codeunit "IP FG Shipment Processing";
+        AdjustmentPosting: Codeunit "IP ICR Adjustment Posting";
         MovementLogMgt: Codeunit "IP ICR Movement Log Mgt";
         ValidatedTxt: Label 'ICR movement %1 validated against %2 %3.', Comment = '%1 = Entry No., %2 = Document type, %3 = Document No.';
 
@@ -37,6 +39,9 @@ codeunit 50418 "IP ICR Movement Posting"
                 ProcessGoodsReceipt(MovementHeader);
             MovementHeader."Movement Type"::"Transfer to 3PL":
                 FGShipmentProcessing.ProcessShipment(MovementHeader);
+            MovementHeader."Movement Type"::"Positive Adjustment",
+            MovementHeader."Movement Type"::"Negative Adjustment":
+                AdjustmentPosting.PostAdjustment(MovementHeader);
         end;
     end;
 

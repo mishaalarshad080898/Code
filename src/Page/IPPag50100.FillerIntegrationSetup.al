@@ -124,6 +124,18 @@ page 50100 "IP Filler Integration Setup"
                 {
                     ToolTip = 'Specifies the in-transit location used on finished goods transfer orders created from filler shipment payloads.';
                 }
+                field("Adj. Jnl. Template Name"; Rec."Adj. Jnl. Template Name")
+                {
+                    ToolTip = 'Specifies the item journal template used for ICR positive and negative adjustments (MVT_TYPE 100 / 101).';
+                }
+                field("Adj. Jnl. Batch Name"; Rec."Adj. Jnl. Batch Name")
+                {
+                    ToolTip = 'Specifies the item journal batch that ICR positive and negative adjustments are loaded into.';
+                }
+                field("Auto Post Adjustments"; Rec."Auto Post Adjustments")
+                {
+                    ToolTip = 'Specifies whether ICR adjustment lines are posted automatically or left in the batch for user review.';
+                }
             }
         }
     }
